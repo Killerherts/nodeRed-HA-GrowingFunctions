@@ -1,8 +1,8 @@
 const d = global.get('homeassistant').homeAssistant;
-let flipStarted = d.states["input_boolean.flip_to_flower_side1"].state === "on"; // Convert the state to a boolean
-let numberOfFeeds = d.states["input_number.number_of_feeds_side1"].state;
-let startFeedTime = d.states["input_datetime.lights_on_time_side1"].state;
-let generativeSteering = d.states["input_boolean.generative_steering_side1"].state === "on";
+let flipStarted = d.states["input_boolean.has_flip_to_flower_started"].state === "on"; // Convert the state to a boolean
+let numberOfFeeds = d.states["input_number.number_of_feeds_flower_area"].state;
+let startFeedTime = d.states["input_datetime.lights_on_time"].state;
+let generativeSteering = d.states["input_boolean.generative_steering_flower"].state === "on";
 let currentTime = "";
 let lightOffTime = "";
 let lightOnTime = "";
@@ -108,19 +108,34 @@ function formatFeedTimes(feedTimes) {
 let formattedFeedTimes = formatFeedTimes(feedTimes);
 let feedAction = checkFeedTime(feedTimes);
 
-if (currentTime >= lightOnTime && d.states["switch.veg_light_switch"]?.state === "off") {
-    node.status({ fill: "green", shape: "dot", text: "Turn On" });
-    msg.payload.lightAction = 'Turned On';
-    console.log('Lights turned on.');
-    return [null, null, { payload: "turn_on" }];
+if (lightOffTime > lightOnTime) {
+    if (currentTime >= lightOnTime && currentTime < lightOffTime && d.states["switch.600_rspec"]?.state === "off") {
+        node.status({ fill: "green", shape: "dot", text: "Turn On" });
+        msg.payload.lightAction = 'Turned On';
+        console.log('Lights turned on.');
+        return [null, null, { payload: "turn_on" }];
+    }
+    if (currentTime >= lightOffTime && d.states["switch.600_rspec"]?.state === "on") {
+        node.status({ fill: "red", shape: "dot", text: "Turn Off" });
+        msg.payload.lightAction = 'Turned Off';
+        console.log('Lights turned off.');
+        return [null, null, { payload: "turn_off" }];
+    }
+} else {
+    if ((currentTime >= lightOnTime || currentTime < lightOffTime) && d.states["switch.600_rspec"]?.state === "off") {
+        node.status({ fill: "green", shape: "dot", text: "Turn On" });
+        msg.payload.lightAction = 'Turned On';
+        console.log('Lights turned on.');
+        return [null, null, { payload: "turn_on" }];
+    }
+    if (currentTime >= lightOffTime && currentTime < lightOnTime && d.states["switch.600_rspec"]?.state === "on") {
+        node.status({ fill: "red", shape: "dot", text: "Turn Off" });
+        msg.payload.lightAction = 'Turned Off';
+        console.log('Lights turned off.');
+        return [null, null, { payload: "turn_off" }];
+    }
 }
 
-if (currentTime >= lightOffTime && d.states["switch.veg_light_switch"]?.state === "on") {
-    node.status({ fill: "red", shape: "dot", text: "Turn Off" });
-    msg.payload.lightAction = 'Turned Off';
-    console.log('Lights turned off.');
-    return [null, null, { payload: "turn_off" }];
-}
 if (feedAction === "feed") {
     node.status({ fill: "yellow", shape: "dot", text: "Feed" });
     return [{ payload: "feed" }, null, null];
