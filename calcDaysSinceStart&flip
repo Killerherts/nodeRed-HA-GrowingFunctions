@@ -1,0 +1,180 @@
+[{
+    "id": "8813c2ec1f027097",
+    "type": "inject",
+    "z": "1f61e07f53956bdf",
+    "name": "",
+    "props": [{
+        "p": "payload"
+    }, {
+        "p": "topic",
+        "vt": "str"
+    }],
+    "repeat": "60",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 190,
+    "y": 980,
+    "wires": [
+        ["d9f943edbf08d770", "fc0db658c88ae396"]
+    ]
+}, {
+    "id": "d9f943edbf08d770",
+    "type": "api-current-state",
+    "z": "1f61e07f53956bdf",
+    "name": "",
+    "server": "",
+    "version": 3,
+    "outputs": 1,
+    "halt_if": "",
+    "halt_if_type": "str",
+    "halt_if_compare": "is",
+    "entity_id": "input_datetime.side_1_start_day",
+    "state_type": "str",
+    "blockInputOverrides": false,
+    "outputProperties": [{
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "entityState"
+    }, {
+        "property": "data",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "entity"
+    }],
+    "for": 0,
+    "forType": "num",
+    "forUnits": "minutes",
+    "x": 480,
+    "y": 940,
+    "wires": [
+        ["bdc2aec4bea70b0d"]
+    ]
+}, {
+    "id": "bdc2aec4bea70b0d",
+    "type": "function",
+    "z": "1f61e07f53956bdf",
+    "name": "calculate days",
+    "func": "var startDate = new Date(msg.payload);\nvar now = new Date();\n\n// calculate difference in total days\nvar diffInTime = now.getTime() - startDate.getTime();\nvar diffInTotalDays = diffInTime / (1000 * 3600 * 24);\n\n// calculate weeks and days\nvar diffInWeeks = Math.floor(diffInTotalDays / 7);\nvar diffInDays = Math.floor(diffInTotalDays % 7);\n\nmsg.payload = \"Weeks: \" + diffInWeeks + \", Days: \" + diffInDays + \", Total Days: \" + Math.floor(diffInTotalDays);\nreturn msg;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 760,
+    "y": 940,
+    "wires": [
+        ["50e4c6be617e050d"]
+    ]
+}, {
+    "id": "50e4c6be617e050d",
+    "type": "api-call-service",
+    "z": "1f61e07f53956bdf",
+    "name": "",
+    "server": "",
+    "version": 5,
+    "debugenabled": false,
+    "domain": "input_text",
+    "service": "set_value",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": ["input_text.side_time_since_start"],
+    "data": "{\"value\": \"{{payload}}\"}",
+    "dataType": "json",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [{
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "data"
+    }],
+    "queue": "none",
+    "x": 980,
+    "y": 940,
+    "wires": [
+        []
+    ]
+}, {
+    "id": "6245df4443ee43cf",
+    "type": "api-call-service",
+    "z": "1f61e07f53956bdf",
+    "name": "Time Since Flip Day",
+    "server": "",
+    "version": 5,
+    "debugenabled": false,
+    "domain": "input_text",
+    "service": "set_value",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": ["input_text.time_since_side_1_flip"],
+    "data": "{\"value\": \"{{payload}}\"}",
+    "dataType": "json",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [{
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "data"
+    }],
+    "queue": "none",
+    "x": 980,
+    "y": 1000,
+    "wires": [
+        []
+    ]
+}, {
+    "id": "a2e9777ca031f1c0",
+    "type": "function",
+    "z": "1f61e07f53956bdf",
+    "name": "calculate days",
+    "func": "var startDate = new Date(msg.payload);\nvar now = new Date();\n\n// calculate difference in total days\nvar diffInTime = now.getTime() - startDate.getTime();\nvar diffInTotalDays = diffInTime / (1000 * 3600 * 24);\n\n// calculate weeks and days\nvar diffInWeeks = Math.floor(diffInTotalDays / 7);\nvar diffInDays = Math.floor(diffInTotalDays % 7);\n\nmsg.payload = \"Weeks: \" + diffInWeeks + \", Days: \" + diffInDays + \", Total Days: \" + Math.floor(diffInTotalDays);\nreturn msg;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 760,
+    "y": 1000,
+    "wires": [
+        ["6245df4443ee43cf"]
+    ]
+}, {
+    "id": "fc0db658c88ae396",
+    "type": "api-current-state",
+    "z": "1f61e07f53956bdf",
+    "name": "",
+    "server": "",
+    "version": 3,
+    "outputs": 1,
+    "halt_if": "",
+    "halt_if_type": "str",
+    "halt_if_compare": "is",
+    "entity_id": "input_datetime.side_1_flip_day",
+    "state_type": "str",
+    "blockInputOverrides": false,
+    "outputProperties": [{
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "entityState"
+    }, {
+        "property": "data",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "entity"
+    }],
+    "for": 0,
+    "forType": "num",
+    "forUnits": "minutes",
+    "x": 470,
+    "y": 1000,
+    "wires": [
+        ["a2e9777ca031f1c0"]
+    ]
+}]
