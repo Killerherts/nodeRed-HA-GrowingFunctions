@@ -6,6 +6,8 @@ let generativeSteering = d.states["input_boolean.generative_steering_flower"].st
 let currentTime = "";
 let lightOffTime = "";
 let lightOnTime = "";
+// Get the state of the switch
+let switchState = d.states["switch.switch.600_rspec"]?.state;
 
 //console.log(startFeedTime, numberOfFeeds, flipStarted, generativeSteering);
 
@@ -75,12 +77,7 @@ function calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generative
 }
 
 function checkFeedTime(feedTimes) {
-    currentTime = new Date();
-    let currentHour = currentTime.getHours();
-    let currentMinute = currentTime.getMinutes();
-    let currentSecond = currentTime.getSeconds();
-    let currentTotalSeconds = (currentHour * 60 * 60) + (currentMinute * 60) + currentSecond;
-
+    let currentTotalSeconds = getTotalSeconds();
     // console.log("Current time (seconds):", currentTotalSeconds);
 
     let numberOfFeeds = feedTimes.length;
@@ -99,6 +96,14 @@ function checkFeedTime(feedTimes) {
     return "no feed";
 }
 
+function getTotalSeconds() {
+    let currentTime = new Date();
+    let currentHour = currentTime.getHours();
+    let currentMinute = currentTime.getMinutes();
+    let currentSecond = currentTime.getSeconds();
+    return (currentHour * 60 * 60) + (currentMinute * 60) + currentSecond;
+}
+
 function formatFeedTimes(feedTimes) {
     let formattedFeedTimes = feedTimes.map(feedTime => feedTime.toString());
     let table = formattedFeedTimes.join("\n");
@@ -107,28 +112,23 @@ function formatFeedTimes(feedTimes) {
 
 let formattedFeedTimes = formatFeedTimes(feedTimes);
 let feedAction = checkFeedTime(feedTimes);
+let currentTotalSeconds = getTotalSeconds();
 
-if (lightOffTime > lightOnTime) {
-    if (currentTime >= lightOnTime && currentTime < lightOffTime && d.states["switch.600_rspec"]?.state === "off") {
+console.log("Lights on: " + lightOnTime + " Lights Off: " + lightOffTime + " Current Seconds: " + currentTotalSeconds)
+
+if (switchState === "off") {
+    // Check if we are before or after midnight
+    let currentTotalSeconds = getTotalSeconds();
+    if (currentTotalSeconds >= parseInt(lightOnTime) && currentTotalSeconds < parseInt(lightOffTime)) {
         node.status({ fill: "green", shape: "dot", text: "Turn On" });
         msg.payload.lightAction = 'Turned On';
         console.log('Lights turned on.');
         return [null, null, { payload: "turn_on" }];
     }
-    if (currentTime >= lightOffTime && d.states["switch.600_rspec"]?.state === "on") {
-        node.status({ fill: "red", shape: "dot", text: "Turn Off" });
-        msg.payload.lightAction = 'Turned Off';
-        console.log('Lights turned off.');
-        return [null, null, { payload: "turn_off" }];
-    }
-} else {
-    if ((currentTime >= lightOnTime || currentTime < lightOffTime) && d.states["switch.600_rspec"]?.state === "off") {
-        node.status({ fill: "green", shape: "dot", text: "Turn On" });
-        msg.payload.lightAction = 'Turned On';
-        console.log('Lights turned on.');
-        return [null, null, { payload: "turn_on" }];
-    }
-    if (currentTime >= lightOffTime && currentTime < lightOnTime && d.states["switch.600_rspec"]?.state === "on") {
+} else if (switchState === "on") {
+    // Check if we are before or after midnight
+    let currentTotalSeconds = getTotalSeconds();
+    if (currentTotalSeconds >= parseInt(lightOffTime) || currentTotalSeconds < parseInt(lightOnTime)) {
         node.status({ fill: "red", shape: "dot", text: "Turn Off" });
         msg.payload.lightAction = 'Turned Off';
         console.log('Lights turned off.');
