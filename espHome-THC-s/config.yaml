@@ -1,40 +1,53 @@
-captive_portal:
 ###credits:DIY_GUY
+captive_portal:
+
 ### RS485
 uart:
+
   id: modbus_serial
 
-  rx_pin: 1
+  rx_pin: RX
 
-  tx_pin: 2
+  tx_pin: TX
 
   baud_rate: 4800
 
   stop_bits: 1
 
+ 
+
 modbus:
+
   id: modbus1
 
   uart_id: modbus_serial
 
+  flow_control_pin: GPIO5
+
+ 
+
 modbus_controller:
-  - id: con_modbus_name
+
+  - id: epever
 
     update_interval: 11s
 
-    address: 0x1
+    address: 1
 
     command_throttle: 150ms
 
     setup_priority: -10
 
+ 
+
 sensor:
+
   - platform: modbus_controller
     name: "Moisture WC"
     id: WC
     address: 0x0000
     unit_of_measurement: "%"
-    register_type: read
+    register_type: holding
     value_type: U_WORD
     accuracy_decimals: 1
     filters:
@@ -46,7 +59,7 @@ sensor:
     id: C
     address: 0x0001
     unit_of_measurement: "°C"
-    register_type: read
+    register_type: holding
     value_type: U_WORD
     accuracy_decimals: 1
     filters:
@@ -58,7 +71,7 @@ sensor:
     id: EC
     address: 0x0002
     unit_of_measurement: "ms/cm"
-    register_type: read
+    register_type: holding
     value_type: U_WORD
     accuracy_decimals: 1
     filters:
