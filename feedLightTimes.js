@@ -1,21 +1,29 @@
-// HomeAssistant object
+// Get Home Assistant global object
 const d = global.get('homeassistant').homeAssistant;
 
-// Convert states to boolean
-let flipStarted = d.states["input_boolean.flip_to_flower_side1"].state === "on";
-let generativeSteering = d.states["input_boolean.generative_steering_side1"].state === "on";
-
-// Get other states
-let numberOfFeeds = d.states["input_number.number_of_feeds_side1"].state;
-let startFeedTime = d.states["input_datetime.lights_on_time_side1"].state;
-let switchState = d.states["switch.veg_light_switch"]?.state;
-
-// Define variables
+// Convert state values to boolean or numbers
+let flipStarted = d.states["input_boolean.has_flip_to_flower_started"].state === "on"; // Convert the state to a boolean
+let numberOfFeeds = d.states["input_number.number_of_feeds_flower_area"].state;
+let startFeedTime = d.states["input_datetime.lights_on_time"].state;
+let generativeSteering = d.states["input_boolean.generative_steering_flower"].state === "on";
+let startFlipDate = d.states["input_datetime.side_2_flip_day"].state;
+// Initialize variables
 let currentTime = "";
 let lightOffTime = "";
 let lightOnTime = "";
-
-// Function to convert a time string to seconds
+// Get the state of the switch
+let switchState = d.states["switch.600_rspec"]?.state;
+// Calculate feed times
+let feedTimes = calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering, startFlipDate);
+// Function to get number of days since flip
+function getDaysSinceFlip(startFlipDate) {
+    let today = new Date();
+    let flipDay = new Date(startFlipDate);
+    let timeDiff = Math.abs(today.getTime() - flipDay.getTime());
+    let diffDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)); // get difference in days
+    return diffDays;
+}
+// Function to convert time to seconds
 function convertTime(timeString) {
     let time;
     let isUtc = false;
@@ -43,39 +51,33 @@ function convertTime(timeString) {
         seconds = time.getSeconds();
     }
     currentTime = hours * 60 * 60 + minutes * 60 + seconds;
-    return hours * 60 * 60 + minutes * 60 + seconds;
+    return parseInt(hours * 60 * 60) + parseInt(minutes * 60) + parseInt(seconds);
 }
-
 // Function to calculate feed times
-function calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering) {
-    let lastFeedTime = 0;
+function calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering, startFlipDate) {
+    let daysSinceFlip = flipStarted ? getDaysSinceFlip(startFlipDate) : 0;
+    let reducedLightHours = Math.min(daysSinceFlip, 6); // limit the reduction to 6 hours
     let startFeedTimeSeconds = convertTime(startFeedTime);
-    lightOnTime = convertTime(startFeedTime);
+    lightOnTime = startFeedTimeSeconds;
+    let totalLightHours = 18 - reducedLightHours;
+    let totalLightSeconds = totalLightHours * 60 * 60;
+    let lastFeedTime = startFeedTimeSeconds + totalLightSeconds;
 
-    // If flip started, adjust feed and light times accordingly
-    if (flipStarted) {
-        lastFeedTime = startFeedTimeSeconds + (12 * 60 * 60);
-        lightOffTime = lastFeedTime;
-    } else {
-        lastFeedTime = startFeedTimeSeconds + (18 * 60 * 60);
-        lightOffTime = lastFeedTime;
-    }
-
-    // If generative steering is on, adjust feed times
     if (generativeSteering) {
         startFeedTimeSeconds += 1.5 * 60 * 60;
-        lastFeedTime -= 3 * 60 * 60;
+        totalLightSeconds -= 3 * 60 * 60;
     } else {
         startFeedTimeSeconds += 1 * 60 * 60;
-        lastFeedTime -= 1 * 60 * 60;
+        totalLightSeconds -= 1 * 60 * 60;
     }
 
-    let feedTimes = [];
-    let feedTime = 0;
+    lightOffTime = (startFeedTimeSeconds + totalLightSeconds) % (24 * 60 * 60);
+    let feedIntervalSeconds = totalLightSeconds / numberOfFeeds;
 
     // Calculate feed times
+    let feedTimes = [];
     for (let i = 0; i < numberOfFeeds; i++) {
-        feedTime = startFeedTimeSeconds + i * Math.round((lastFeedTime - startFeedTimeSeconds) / (numberOfFeeds - 1));
+        let feedTime = startFeedTimeSeconds + i * feedIntervalSeconds;
         feedTime = feedTime % (24 * 60 * 60);
 
         let hours = Math.floor(feedTime / 3600);
@@ -88,17 +90,18 @@ function calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generative
 
         feedTimes.push(hours + ":" + minutes + ":" + seconds);
     }
-
+    feedTimes.push("\nLights Off Time " + Math.floor(parseInt(lightOffTime) / 3600) + ":" + ("0" + Math.floor((parseInt(lightOffTime) % 3600) / 60)).slice(-2));
     return feedTimes;
 }
 
-// Function to check if it's feed time
+// Function to check if it's time to feed
 function checkFeedTime(feedTimes) {
     let currentTotalSeconds = convertTime();
+    // console.log("Current time (seconds):", currentTotalSeconds);
+
     let numberOfFeeds = feedTimes.length;
     let lastFeedTime = context.get("lastFeedTime") || 0;
 
-    // Loop over feed times and check if it's time to feed
     for (let i = 0; i < numberOfFeeds; i++) {
         let feedTimeSeconds = convertTime(feedTimes[i]);
         let timeDiffSeconds = Math.abs(currentTotalSeconds - feedTimeSeconds);
@@ -112,37 +115,82 @@ function checkFeedTime(feedTimes) {
     return "no feed";
 }
 
-// Function to format feed times for display
+// Function to format feed times
 function formatFeedTimes(feedTimes) {
     let formattedFeedTimes = feedTimes.map(feedTime => feedTime.toString());
     let table = formattedFeedTimes.join("\n");
     return table;
 }
 
-// Get feed times and formatted feed times
-let feedTimes = calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering);
 let formattedFeedTimes = formatFeedTimes(feedTimes);
-
-// Check if it's time to feed
 let feedAction = checkFeedTime(feedTimes);
+let currentTotalSeconds = convertTime();
 
-// Check if it's time to turn the lights on or off
-const currentTotalSeconds = convertTime();
+//console.log("Lights on: " + lightOnTime + " Lights Off: " + lightOffTime + " Current Seconds: " + currentTotalSeconds)
+
+// Check if it's time to turn the lights on
 if (switchState === "off") {
-    if (lightOffTime < lightOnTime && currentTotalSeconds < lightOnTime && currentTotalSeconds < lightOffTime ||
-        lightOffTime >= lightOnTime && currentTotalSeconds >= lightOnTime) {
-        return [null, null, { payload: "turn_on" }];
+    const currentTotalSeconds = convertTime();
+    if (parseInt(lightOffTime) < parseInt(lightOnTime)) {
+        // Span across midnight, compare current time with lightsOn and lightsOff
+        if (
+            currentTotalSeconds > parseInt(lightOnTime) ||
+            currentTotalSeconds < parseInt(lightOffTime)
+        ) {
+            // Turn on lights
+            node.status({ fill: "green", shape: "dot", text: "Turn On" });
+            msg.payload.lightAction = 'Turned On';
+            console.log('Lights turned on. condit 1');
+            return [null, null, { payload: "turn_on" }];
+        }
+    } else {
+        // Same day comparison
+        if (
+            currentTotalSeconds >= parseInt(lightOnTime) &&
+            !(currentTotalSeconds > parseInt(lightOffTime))
+        ) {
+            // Turn on lights
+            node.status({ fill: "green", shape: "dot", text: "Turn On" });
+            msg.payload.lightAction = 'Turned On';
+            console.log('Lights turned on. condit 2');
+            return [null, null, { payload: "turn_on" }];
+        }
     }
-} else if (switchState === "on") {
-    if (lightOffTime < lightOnTime && currentTotalSeconds > lightOffTime && currentTotalSeconds < lightOnTime ||
-        lightOffTime >= lightOnTime && currentTotalSeconds > lightOffTime) {
-        return [null, null, { payload: "turn_off" }];
+}
+// Check if it's time to turn the lights off
+else if (switchState === "on") {
+    const currentTotalSeconds = convertTime();
+    if (parseInt(lightOffTime) < parseInt(lightOnTime)) {
+        // Span across midnight, compare current time with lightsOn and lightsOff
+        if (
+            currentTotalSeconds > parseInt(lightOffTime) &&
+            currentTotalSeconds < parseInt(lightOnTime)
+        ) {
+            // Turn off lights
+            node.status({ fill: "red", shape: "dot", text: "Turn Off" });
+            msg.payload.lightAction = 'Turned Off';
+            console.log('Lights turned off.');
+            return [null, null, { payload: "turn_off" }];
+        }
+    } else {
+        // Same day comparison
+        if (
+            currentTotalSeconds > parseInt(lightOffTime)
+        ) {
+            // Turn off lights
+            node.status({ fill: "red", shape: "dot", text: "Turn Off" });
+            msg.payload.lightAction = 'Turned Off';
+            console.log('Lights turned off.');
+            return [null, null, { payload: "turn_off" }];
+        }
     }
 }
 
-// Check if it's time to feed
+
 if (feedAction === "feed") {
+    node.status({ fill: "yellow", shape: "dot", text: "Feed" });
     return [{ payload: "feed" }, null, null];
 } else {
+    node.status({ fill: "blue", shape: "dot", text: "No Feed" });
     return [null, { payload: formattedFeedTimes }, null];
 }
