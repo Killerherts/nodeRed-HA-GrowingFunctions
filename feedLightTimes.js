@@ -13,9 +13,9 @@ let lightOffTime = "";
 let lightOnTime = "";
 // Get the state of the switch
 let switchState = d.states["switch.600_rspec"]?.state;
-// Calculate feed times
+//console.log(startFlipDate, startFeedTime, numberOfFeeds, flipStarted, generativeSteering);
 let feedTimes = calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering, startFlipDate);
-// Function to get number of days since flip
+
 function getDaysSinceFlip(startFlipDate) {
     let today = new Date();
     let flipDay = new Date(startFlipDate);
@@ -23,7 +23,7 @@ function getDaysSinceFlip(startFlipDate) {
     let diffDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)); // get difference in days
     return diffDays;
 }
-// Function to convert time to seconds
+
 function convertTime(timeString) {
     let time;
     let isUtc = false;
@@ -53,7 +53,7 @@ function convertTime(timeString) {
     currentTime = hours * 60 * 60 + minutes * 60 + seconds;
     return parseInt(hours * 60 * 60) + parseInt(minutes * 60) + parseInt(seconds);
 }
-// Function to calculate feed times
+
 function calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering, startFlipDate) {
     let daysSinceFlip = flipStarted ? getDaysSinceFlip(startFlipDate) : 0;
     let reducedLightHours = Math.min(daysSinceFlip, 6); // limit the reduction to 6 hours
@@ -61,23 +61,24 @@ function calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generative
     lightOnTime = startFeedTimeSeconds;
     let totalLightHours = 18 - reducedLightHours;
     let totalLightSeconds = totalLightHours * 60 * 60;
-    let lastFeedTime = startFeedTimeSeconds + totalLightSeconds;
 
+    let feedStartSeconds = startFeedTimeSeconds;
+    let feedLightSeconds = totalLightSeconds;
     if (generativeSteering) {
-        startFeedTimeSeconds += 1.5 * 60 * 60;
-        totalLightSeconds -= 3 * 60 * 60;
+        feedStartSeconds += 1.5 * 60 * 60;
+        feedLightSeconds -= 3 * 60 * 60;
     } else {
-        startFeedTimeSeconds += 1 * 60 * 60;
-        totalLightSeconds -= 1 * 60 * 60;
+        feedStartSeconds += 1 * 60 * 60;
+        feedLightSeconds -= 1 * 60 * 60;
     }
 
     lightOffTime = (startFeedTimeSeconds + totalLightSeconds) % (24 * 60 * 60);
-    let feedIntervalSeconds = totalLightSeconds / numberOfFeeds;
+    let feedIntervalSeconds = feedLightSeconds / numberOfFeeds;
 
     // Calculate feed times
     let feedTimes = [];
     for (let i = 0; i < numberOfFeeds; i++) {
-        let feedTime = startFeedTimeSeconds + i * feedIntervalSeconds;
+        let feedTime = feedStartSeconds + i * feedIntervalSeconds;
         feedTime = feedTime % (24 * 60 * 60);
 
         let hours = Math.floor(feedTime / 3600);
@@ -94,7 +95,7 @@ function calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generative
     return feedTimes;
 }
 
-// Function to check if it's time to feed
+
 function checkFeedTime(feedTimes) {
     let currentTotalSeconds = convertTime();
     // console.log("Current time (seconds):", currentTotalSeconds);
@@ -115,7 +116,6 @@ function checkFeedTime(feedTimes) {
     return "no feed";
 }
 
-// Function to format feed times
 function formatFeedTimes(feedTimes) {
     let formattedFeedTimes = feedTimes.map(feedTime => feedTime.toString());
     let table = formattedFeedTimes.join("\n");
@@ -134,7 +134,7 @@ if (switchState === "off") {
     if (parseInt(lightOffTime) < parseInt(lightOnTime)) {
         // Span across midnight, compare current time with lightsOn and lightsOff
         if (
-            currentTotalSeconds > parseInt(lightOnTime) ||
+            currentTotalSeconds > parseInt(lightOnTime) &&
             currentTotalSeconds < parseInt(lightOffTime)
         ) {
             // Turn on lights
