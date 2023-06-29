@@ -4,29 +4,33 @@ const MIN_IRRIGATION_FREQUENCY = 10 * 60; // 10 minutes in seconds
 const DESIRED_MOISTURE = 42; // Desired moisture level in water content percentage
 const P1_THRESHOLD = 4;
 const P2_THRESHOLD = 3;
+const MAX_DELTA = 20;
 
 // Retrieve necessary data from Home Assistant
 let generative = getHAState('input_boolean.generative_steering_side1') === 'on';
 let flipToFlower = getHAState('input_boolean.flip_to_flower_side1') === 'on';
 let lightOnTime = convertTime(getHAState('input_datetime.lights_on_time_side1'));
 let soilMoisture = parseFloat(getHAState('sensor.soilsensor_moisture_wc'));
-let lastSoilMoisture = parseFloat(getHAState('input_number.side_1_last_soil_moisture')) || 0;
+let last2SoilMoistureReadings = getLast2SoilMoistureReadings();
 let maintenancePhase = getHAState('input_boolean.side_1_maintaince_phase') === 'on';
-let lastIrrigationTime = getLastIrrigationTime();
-
-// Current time
 let currentTime = getCurrentTime();
+
+// Update the last2SoilMoistureReadings array
+if (last2SoilMoistureReadings.length === 2) {
+    last2SoilMoistureReadings.shift();
+}
+last2SoilMoistureReadings.push(soilMoisture);
 
 // Calculate parameters
 let dryBackThreshold = DESIRED_MOISTURE - 3;
 let lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
 let irrigationEnd = calculateIrrigationEnd(lightOffTime);
-let timeSinceLastIrrigation = calculateTimeSinceLastIrrigation(getLastIrrigationTime());
-
+let timeSinceLastIrrigation = calculateTimeSinceLastIrrigation();
 
 let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
-let soilMoistureChange = calculateSoilMoistureChange(soilMoisture, lastSoilMoisture);
+let soilMoistureChange = calculateSoilMoistureChange(soilMoisture, last2SoilMoistureReadings[0]);
+
 
 // Function to convert time
 function convertTime(timeString) {
@@ -62,11 +66,6 @@ function getHAState(state) {
     return global.get('homeassistant').homeAssistant.states[state].state;
 }
 
-// Function to retrieve last irrigation time
-function getLastIrrigationTime() {
-    let lastIrrigationDate = new Date(getHAState('switch.side_1_feeder_pump').last_changed);
-    return lastIrrigationDate.getSeconds() + (60 * (lastIrrigationDate.getMinutes() + 60 * lastIrrigationDate.getHours()));
-}
 
 
 // Function to get current time in seconds
@@ -81,15 +80,26 @@ function calculateLightOffTime(flipToFlower, lightOnTime) {
     return flipToFlower ? lightOnTime + 12 * 60 * 60 : lightOnTime + 18 * 60 * 60;
 }
 
-// Function to calculate irrigation start time
+// Function to calculate irrigation start time dynamically based on lights on time
 function calculateIrrigationStart(generative, lightOnTime) {
-    return generative ? lightOnTime + 2 * 60 * 60 : lightOnTime + 60 * 60;
+    let irrigationStart = lightOnTime;
+
+    if (generative) {
+        irrigationStart += 2 * 60 * 60; // Add 2 hours for generative steering
+    } else {
+        // Use a default start time if generative is not enabled
+        irrigationStart += 60 * 60; // Add 1 hour
+    }
+
+    return irrigationStart;
 }
 
-// Function to calculate irrigation end time
+// Function to calculate irrigation end time dynamically based on light off time
 function calculateIrrigationEnd(lightOffTime) {
     return (lightOffTime - 60 * 60) % SECONDS_IN_DAY;
 }
+
+
 
 // Function to calculate time since last irrigation
 function calculateTimeSinceLastIrrigation(lastIrrigationTime) {
@@ -120,7 +130,7 @@ function logDebugData() {
     node.warn("Generative: " + generative);
     node.warn("Flip to flower: " + flipToFlower);
     node.warn("Soil moisture: " + soilMoisture);
-    node.warn("Last soil moisture: " + lastSoilMoisture);
+    node.warn("Last 2 soil moisture: " + last2SoilMoistureReadings);
     node.warn("Current time: " + currentTime);
     node.warn("Irrigation start time: " + irrigationStart);
     node.warn("Irrigation end time: " + irrigationEnd);
@@ -128,25 +138,81 @@ function logDebugData() {
 
 // Process control flow
 function processControlFlow() {
+    // Calculate parameters
+    //currentTime = getCurrentTime();
+    let dryBackThreshold = DESIRED_MOISTURE - 3;
+    let lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);
+    let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
+    let irrigationEnd = calculateIrrigationEnd(lightOffTime);
+    let timeSinceLastIrrigation = calculateTimeSinceLastIrrigation();
+    
+    let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
+    let soilMoistureChange = calculateSoilMoistureChange(soilMoisture, last2SoilMoistureReadings[0]);
+
     if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {
         node.warn(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
         return [null, null, null];
     }
 
+    if (Math.abs(soilMoistureChange) > MAX_DELTA) {
+        node.warn(`Delta of soil moisture is greater than ${MAX_DELTA}%. Outputting to a new 4th return.`);
+        last2SoilMoistureReadings.push(soilMoisture);
+        if (last2SoilMoistureReadings.length > 2) {
+            last2SoilMoistureReadings.shift();
+        }
+        return [null, null, null, { payload: "max_delta", array: last2SoilMoistureReadings }];
+    }
+
     if (inIrrigationWindow) {
         if (soilMoistureChange < P1_THRESHOLD && !maintenancePhase) {
-            node.warn(`Soil moisture didn't raise more than ${P1_THRESHOLD}%. Moving to phase 1.`);
-            return [{ payload: "feed" }, null, null];
+            node.warn(`Soil moisture didn't raise more than ${P1_THRESHOLD}%. Moving to phase 2.`);
+            last2SoilMoistureReadings.push(soilMoisture);
+            if (last2SoilMoistureReadings.length > 2) {
+                last2SoilMoistureReadings.shift();
+            }
+            const value = JSON.stringify(last2SoilMoistureReadings);
+            return [{ payload: "feed", array: last2SoilMoistureReadings }, null, null];
         } else if (soilMoistureChange < P2_THRESHOLD && maintenancePhase) {
-            node.warn(`Soil moisture dropped by more than ${P2_THRESHOLD}%. Moving to phase 2.`);
-            return [null, { payload: "feed" }, null];
+            node.warn(`Soil moisture dropped by more than ${P2_THRESHOLD}%. Moving to phase 3.`);
+            last2SoilMoistureReadings.push(soilMoisture);
+            if (last2SoilMoistureReadings.length > 2) {
+                last2SoilMoistureReadings.shift();
+            }
+            return [null, { payload: "feed", array: last2SoilMoistureReadings }, null];
         }
     } else {
-        node.warn(`Outside of irrigation window or soil moisture within the desired range. Moving to phase 3.`);
-        return [null, null, { payload: "reset" }];
+        if (currentTime > irrigationEnd && currentTime < irrigationStart) {
+            node.warn(`Outside of irrigation window or soil moisture within the desired range. Resetting.`);
+            last2SoilMoistureReadings.push(soilMoisture);
+            if (last2SoilMoistureReadings.length > 2) {
+                last2SoilMoistureReadings.shift();
+            }
+            return [null, null, { payload: "reset" }];
+        } else {
+            node.warn(`Outside of irrigation window. Not resetting.`);
+            return [null, null, null];
+        }
     }
+}
+
+
+// Function to retrieve last 2 soil moisture readings and convert to an array of numbers
+function getLast2SoilMoistureReadings() {
+    let readingsStr = getHAState('input_text.side_1_last_2_soil_wc');
+    let readingsArr = readingsStr.split(',').map(Number);
+
+    // Check if any reading is NaN, if so replace it with current soil moisture
+    for (let i = 0; i < readingsArr.length; i++) {
+        if (isNaN(readingsArr[i])) {
+            readingsArr[i] = soilMoisture;
+        }
+    }
+
+    return readingsArr;
 }
 
 //run
 //logDebugData();
+// Run the debug function
+//return processControlFlowDebug();
 return processControlFlow();
