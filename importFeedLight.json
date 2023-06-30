@@ -1,0 +1,483 @@
+[
+    {
+      "id": "6b6c45ae20175d43",
+      "type": "inject",
+      "z": "e9ac4911b30dde89",
+      "name": "",
+      "props": [
+        {
+          "p": "payload"
+        },
+        {
+          "p": "topic",
+          "vt": "str"
+        },
+        {
+          "p": "timestamp",
+          "v": "$globalContext(\"time\")",
+          "vt": "jsonata"
+        }
+      ],
+      "repeat": "40",
+      "crontab": "",
+      "once": false,
+      "onceDelay": 0.1,
+      "topic": "Every 8 second",
+      "payload": "test",
+      "payloadType": "str",
+      "x": 140,
+      "y": 20,
+      "wires": [
+        [
+          "be82b1d9051b2c72"
+        ]
+      ]
+    },
+    {
+      "id": "be82b1d9051b2c72",
+      "type": "ha-wait-until",
+      "z": "e9ac4911b30dde89",
+      "name": "",
+      "server": "",
+      "version": 2,
+      "outputs": 2,
+      "entityId": "input_boolean.turn_off_grow_side_2",
+      "entityIdFilterType": "exact",
+      "property": "state",
+      "comparator": "is",
+      "value": "off",
+      "valueType": "str",
+      "timeout": "1",
+      "timeoutType": "num",
+      "timeoutUnits": "seconds",
+      "checkCurrentState": true,
+      "blockInputOverrides": true,
+      "outputProperties": [],
+      "entityLocation": "data",
+      "entityLocationType": "none",
+      "x": 180,
+      "y": 80,
+      "wires": [
+        [
+          "6eb79e879374d327"
+        ],
+        []
+      ]
+    },
+    {
+      "id": "6eb79e879374d327",
+      "type": "ha-wait-until",
+      "z": "e9ac4911b30dde89",
+      "name": " Dry switch on",
+      "server": "",
+      "version": 2,
+      "outputs": 2,
+      "entityId": "input_boolean.dry_time_side2",
+      "entityIdFilterType": "exact",
+      "property": "state",
+      "comparator": "is",
+      "value": "on",
+      "valueType": "str",
+      "timeout": "1",
+      "timeoutType": "num",
+      "timeoutUnits": "seconds",
+      "checkCurrentState": true,
+      "blockInputOverrides": true,
+      "outputProperties": [],
+      "entityLocation": "data",
+      "entityLocationType": "none",
+      "x": 300,
+      "y": 140,
+      "wires": [
+        [
+          "d3e10433e8f9b397"
+        ],
+        [
+          "1390b8a9fc685e84"
+        ]
+      ]
+    },
+    {
+      "id": "d3e10433e8f9b397",
+      "type": "api-call-service",
+      "z": "e9ac4911b30dde89",
+      "name": "Set input Text",
+      "server": "",
+      "version": 5,
+      "debugenabled": false,
+      "domain": "input_text",
+      "service": "set_value",
+      "areaId": [],
+      "deviceId": [],
+      "entityId": [
+        "input_text.side_2_feed_times"
+      ],
+      "data": "{ \"value\" : \"Drying\"}",
+      "dataType": "jsonata",
+      "mergeContext": "",
+      "mustacheAltTags": false,
+      "outputProperties": [],
+      "queue": "none",
+      "x": 500,
+      "y": 200,
+      "wires": [
+        []
+      ]
+    },
+    {
+      "id": "1390b8a9fc685e84",
+      "type": "function",
+      "z": "e9ac4911b30dde89",
+      "name": "calc Light and feed",
+      "func": "const d = global.get('homeassistant').homeAssistant;\nlet flipStarted = d.states[\"input_boolean.has_flip_to_flower_started\"].state === \"on\"; // Convert the state to a boolean\nlet numberOfFeeds = d.states[\"input_number.number_of_feeds_flower_area\"].state;\nlet startFeedTime = d.states[\"input_datetime.lights_on_time\"].state;\nlet generativeSteering = d.states[\"input_boolean.generative_steering_flower\"].state === \"on\";\nlet startFlipDate = d.states[\"input_datetime.side_2_flip_day\"].state; // add this in\nlet currentTime = \"\";\nlet lightOffTime = \"\";\nlet lightOnTime = \"\";\n// Get the state of the switch\nlet switchState = d.states[\"switch.600_rspec\"]?.state;\n\nlet feedTimes = calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering, startFlipDate);\n\nfunction getDaysSinceFlip(startFlipDate) {\n    let today = new Date();\n    let flipDay = new Date(startFlipDate);\n    let timeDiff = Math.abs(today.getTime() - flipDay.getTime());\n    let diffDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)); // get difference in days\n    return diffDays;\n}\n\nfunction convertTime(timeString) {\n    let time;\n    let isUtc = false;\n\n    // When no argument is provided, use the current time\n    if (!timeString) {\n        time = new Date();\n    } else {\n        time = new Date(timeString);\n        isUtc = timeString.includes(\"Z\") || timeString.includes(\"+\") || timeString.includes(\"-\");\n        if (isNaN(time.getTime())) {\n            time = new Date(\"1970-01-01T\" + timeString + \"Z\");\n            isUtc = true;\n        }\n    }\n\n    let hours, minutes, seconds;\n    if (isUtc) {\n        hours = time.getUTCHours();\n        minutes = time.getUTCMinutes();\n        seconds = time.getUTCSeconds();\n    } else {\n        hours = time.getHours();\n        minutes = time.getMinutes();\n        seconds = time.getSeconds();\n    }\n    currentTime = hours * 60 * 60 + minutes * 60 + seconds;\n    return parseInt(hours * 60 * 60) + parseInt(minutes * 60) + parseInt(seconds);\n}\n\nfunction calculateFeedTime(flipStarted, numberOfFeeds, startFeedTime, generativeSteering, startFlipDate) {\n    let daysSinceFlip = flipStarted ? getDaysSinceFlip(startFlipDate) : 0;\n    let reducedLightHours = Math.min(daysSinceFlip, 6); // limit the reduction to 6 hours\n    let startFeedTimeSeconds = convertTime(startFeedTime);\n    lightOnTime = startFeedTimeSeconds;\n    let totalLightHours = 18 - reducedLightHours;\n    let totalLightSeconds = totalLightHours * 60 * 60;\n\n    let feedStartSeconds = startFeedTimeSeconds;\n    let feedLightSeconds = totalLightSeconds;\n    if (generativeSteering) {\n        feedStartSeconds += 2 * 60 * 60;\n        feedLightSeconds -= 3 * 60 * 60;\n    } else {\n        feedStartSeconds += 1 * 60 * 60;\n        feedLightSeconds -= 1 * 60 * 60;\n    }\n\n    lightOffTime = (startFeedTimeSeconds + totalLightSeconds) % (24 * 60 * 60);\n    let feedIntervalSeconds = feedLightSeconds / numberOfFeeds;\n\n    // Calculate feed times\n    let feedTimes = [];\n    for (let i = 0; i < numberOfFeeds; i++) {\n        let feedTime = feedStartSeconds + i * feedIntervalSeconds;\n        feedTime = feedTime % (24 * 60 * 60);\n\n        let hours = Math.floor(feedTime / 3600);\n        let minutes = Math.floor((feedTime % 3600) / 60);\n        let seconds = feedTime % 60;\n\n        hours = hours < 10 ? \"0\" + hours : hours;\n        minutes = minutes < 10 ? \"0\" + minutes : minutes;\n        seconds = seconds < 10 ? \"0\" + seconds : seconds;\n\n        feedTimes.push(hours + \":\" + minutes + \":\" + seconds);\n    }\n    feedTimes.push(\"\\nLights Off Time \" + Math.floor(parseInt(lightOffTime) / 3600) + \":\" + (\"0\" + Math.floor((parseInt(lightOffTime) % 3600) / 60)).slice(-2));\n    return feedTimes;\n}\n\n\n\nfunction checkFeedTime(feedTimes) {\n    let currentTotalSeconds = convertTime();\n    // console.log(\"Current time (seconds):\", currentTotalSeconds);\n\n    let numberOfFeeds = feedTimes.length;\n    let lastFeedTime = context.get(\"lastFeedTime\") || 0;\n\n    for (let i = 0; i < numberOfFeeds; i++) {\n        let feedTimeSeconds = convertTime(feedTimes[i]);\n        let timeDiffSeconds = Math.abs(currentTotalSeconds - feedTimeSeconds);\n\n        if (timeDiffSeconds <= 30 && feedTimeSeconds !== lastFeedTime) {\n            context.set(\"lastFeedTime\", feedTimeSeconds);\n            return \"feed\";\n        }\n    }\n\n    return \"no feed\";\n}\n\nfunction formatFeedTimes(feedTimes) {\n    let formattedFeedTimes = feedTimes.map(feedTime => feedTime.toString());\n    let table = formattedFeedTimes.join(\"\\n\");\n    return table;\n}\n\nlet formattedFeedTimes = formatFeedTimes(feedTimes);\nlet feedAction = checkFeedTime(feedTimes);\nlet currentTotalSeconds = convertTime();\n\n//console.log(\"Lights on: \" + lightOnTime + \" Lights Off: \" + lightOffTime + \" Current Seconds: \" + currentTotalSeconds)\n\n// Check if it's time to turn the lights on\nif (switchState === \"off\") {\n    if (lightOnTime < lightOffTime) {\n        // Same day comparison\n        if (currentTotalSeconds >= parseInt(lightOnTime) && currentTotalSeconds < parseInt(lightOffTime)) {\n            // Turn on lights\n            node.status({ fill: \"green\", shape: \"dot\", text: \"Turn On\" });\n            msg.payload.lightAction = 'Turned On';\n            console.log('Lights turned on.');\n            return [null, null, { payload: \"turn_on\" }];\n        }\n    } else {\n        // Span across midnight\n        if (currentTotalSeconds >= parseInt(lightOnTime) || currentTotalSeconds < parseInt(lightOffTime)) {\n            // Turn on lights\n            node.status({ fill: \"green\", shape: \"dot\", text: \"Turn On\" });\n            msg.payload.lightAction = 'Turned On';\n            console.log('Lights turned on.');\n            return [null, null, { payload: \"turn_on\" }];\n        }\n    }\n}\n\n// Check if it's time to turn the lights off\nelse if (switchState === \"on\") {\n    if (lightOnTime < lightOffTime) {\n        // Same day comparison\n        if (currentTotalSeconds >= parseInt(lightOffTime)) {\n            // Turn off lights\n            node.status({ fill: \"red\", shape: \"dot\", text: \"Turn Off\" });\n            msg.payload.lightAction = 'Turned Off';\n            console.log('Lights turned off.');\n            return [null, null, { payload: \"turn_off\" }];\n        }\n    } else {\n        // Span across midnight\n        if (currentTotalSeconds < parseInt(lightOnTime) && currentTotalSeconds >= parseInt(lightOffTime)) {\n            // Turn off lights\n            node.status({ fill: \"red\", shape: \"dot\", text: \"Turn Off\" });\n            msg.payload.lightAction = 'Turned Off';\n            console.log('Lights turned off.');\n            return [null, null, { payload: \"turn_off\" }];\n        }\n    }\n}\n\n\nif (feedAction === \"feed\") {\n    node.status({ fill: \"yellow\", shape: \"dot\", text: \"Feed\" });\n    return [{ payload: \"feed\" }, null, null];\n} else {\n    node.status({ fill: \"blue\", shape: \"dot\", text: \"No Feed\" });\n    return [null, { payload: formattedFeedTimes }, null];\n}\n",
+      "outputs": 3,
+      "noerr": 0,
+      "initialize": "",
+      "finalize": "",
+      "libs": [],
+      "x": 510,
+      "y": 100,
+      "wires": [
+        [
+          "2ca86b93ec06f656",
+          "c33a11fbd2ec0228"
+        ],
+        [
+          "4b169d6b8e904fcd"
+        ],
+        [
+          "13ab041508055973"
+        ]
+      ]
+    },
+    {
+      "id": "2ca86b93ec06f656",
+      "type": "api-call-service",
+      "z": "e9ac4911b30dde89",
+      "name": "",
+      "server": "",
+      "version": 5,
+      "debugenabled": false,
+      "domain": "notify",
+      "service": "persistent_notification",
+      "areaId": [],
+      "deviceId": [],
+      "entityId": [],
+      "data": "{\"message\":\"Feed was triggert \",\"title\":\"Function For Feed Ran\"}",
+      "dataType": "jsonata",
+      "mergeContext": "",
+      "mustacheAltTags": false,
+      "outputProperties": [],
+      "queue": "none",
+      "x": 620,
+      "y": 20,
+      "wires": [
+        []
+      ]
+    },
+    {
+      "id": "c33a11fbd2ec0228",
+      "type": "api-current-state",
+      "z": "e9ac4911b30dde89",
+      "name": "Should Skip Next Feed",
+      "server": "",
+      "version": 3,
+      "outputs": 2,
+      "halt_if": "off",
+      "halt_if_type": "str",
+      "halt_if_compare": "is",
+      "entity_id": "input_boolean.skip_next_feed",
+      "state_type": "str",
+      "blockInputOverrides": false,
+      "outputProperties": [
+        {
+          "property": "payload",
+          "propertyType": "msg",
+          "value": "",
+          "valueType": "entityState"
+        },
+        {
+          "property": "data",
+          "propertyType": "msg",
+          "value": "",
+          "valueType": "entity"
+        }
+      ],
+      "for": "0",
+      "forType": "num",
+      "forUnits": "minutes",
+      "override_topic": false,
+      "state_location": "payload",
+      "override_payload": "msg",
+      "entity_location": "data",
+      "override_data": "msg",
+      "x": 840,
+      "y": 80,
+      "wires": [
+        [
+          "8a6cc3094e0a5a65"
+        ],
+        [
+          "f3d6eb58abdef8e0"
+        ]
+      ]
+    },
+    {
+      "id": "4b169d6b8e904fcd",
+      "type": "api-call-service",
+      "z": "e9ac4911b30dde89",
+      "name": "Set input Text",
+      "server": "",
+      "version": 5,
+      "debugenabled": false,
+      "domain": "input_text",
+      "service": "set_value",
+      "areaId": [],
+      "deviceId": [],
+      "entityId": [
+        "input_text.side_2_feed_times"
+      ],
+      "data": "{ \"value\" : payload }",
+      "dataType": "jsonata",
+      "mergeContext": "",
+      "mustacheAltTags": false,
+      "outputProperties": [],
+      "queue": "none",
+      "x": 760,
+      "y": 200,
+      "wires": [
+        []
+      ]
+    },
+    {
+      "id": "13ab041508055973",
+      "type": "api-call-service",
+      "z": "e9ac4911b30dde89",
+      "name": "operate lights",
+      "server": "",
+      "version": 5,
+      "debugenabled": false,
+      "domain": "switch",
+      "service": "{{payload}}",
+      "areaId": [],
+      "deviceId": [],
+      "entityId": [
+        "switch.600_rspec"
+      ],
+      "data": "",
+      "dataType": "jsonata",
+      "mergeContext": "",
+      "mustacheAltTags": false,
+      "outputProperties": [],
+      "queue": "none",
+      "x": 940,
+      "y": 180,
+      "wires": [
+        []
+      ]
+    },
+    {
+      "id": "8a6cc3094e0a5a65",
+      "type": "api-call-service",
+      "z": "e9ac4911b30dde89",
+      "name": "Turn on Feeder",
+      "server": "",
+      "version": 5,
+      "debugenabled": false,
+      "domain": "switch",
+      "service": "turn_on",
+      "areaId": [],
+      "deviceId": [],
+      "entityId": [
+        "switch.side_2_feeder_pump"
+      ],
+      "data": "",
+      "dataType": "jsonata",
+      "mergeContext": "",
+      "mustacheAltTags": false,
+      "outputProperties": [],
+      "queue": "none",
+      "x": 1160,
+      "y": 60,
+      "wires": [
+        [
+          "f28628e9c2bd2615"
+        ]
+      ]
+    },
+    {
+      "id": "f3d6eb58abdef8e0",
+      "type": "api-call-service",
+      "z": "e9ac4911b30dde89",
+      "name": "Turn off Skip Next Feed",
+      "server": "",
+      "version": 5,
+      "debugenabled": false,
+      "domain": "input_boolean",
+      "service": "turn_off",
+      "areaId": [],
+      "deviceId": [],
+      "entityId": [
+        "input_boolean.skip_next_feed"
+      ],
+      "data": "",
+      "dataType": "jsonata",
+      "mergeContext": "",
+      "mustacheAltTags": false,
+      "outputProperties": [],
+      "queue": "none",
+      "x": 930,
+      "y": 140,
+      "wires": [
+        []
+      ]
+    },
+    {
+      "id": "c61cfea28cddba33",
+      "type": "server-state-changed",
+      "z": "e9ac4911b30dde89",
+      "name": "Water Flower Side",
+      "server": "",
+      "version": 4,
+      "exposeToHomeAssistant": false,
+      "haConfig": [
+        {
+          "property": "name",
+          "value": ""
+        },
+        {
+          "property": "icon",
+          "value": ""
+        }
+      ],
+      "entityidfilter": "input_button.water_flower_side_table",
+      "entityidfiltertype": "exact",
+      "outputinitially": false,
+      "state_type": "str",
+      "haltifstate": "",
+      "halt_if_type": "str",
+      "halt_if_compare": "is",
+      "outputs": 1,
+      "output_only_on_state_change": true,
+      "for": "0",
+      "forType": "num",
+      "forUnits": "minutes",
+      "ignorePrevStateNull": false,
+      "ignorePrevStateUnknown": false,
+      "ignorePrevStateUnavailable": false,
+      "ignoreCurrentStateUnknown": false,
+      "ignoreCurrentStateUnavailable": false,
+      "outputProperties": [
+        {
+          "property": "payload",
+          "propertyType": "msg",
+          "value": "",
+          "valueType": "entityState"
+        },
+        {
+          "property": "data",
+          "propertyType": "msg",
+          "value": "",
+          "valueType": "eventData"
+        },
+        {
+          "property": "topic",
+          "propertyType": "msg",
+          "value": "",
+          "valueType": "triggerId"
+        }
+      ],
+      "x": 1150,
+      "y": 120,
+      "wires": [
+        [
+          "8a6cc3094e0a5a65"
+        ]
+      ]
+    },
+    {
+      "id": "f28628e9c2bd2615",
+      "type": "delay",
+      "z": "e9ac4911b30dde89",
+      "name": "",
+      "pauseType": "delay",
+      "timeout": "35",
+      "timeoutUnits": "seconds",
+      "rate": "1",
+      "nbRateUnits": "1",
+      "rateUnits": "second",
+      "randomFirst": "1",
+      "randomLast": "5",
+      "randomUnits": "seconds",
+      "drop": false,
+      "allowrate": false,
+      "outputs": 1,
+      "x": 1340,
+      "y": 60,
+      "wires": [
+        [
+          "4c27f3579409e384"
+        ]
+      ]
+    },
+    {
+      "id": "4c27f3579409e384",
+      "type": "api-call-service",
+      "z": "e9ac4911b30dde89",
+      "name": "Turn off Feeder",
+      "server": "",
+      "version": 5,
+      "debugenabled": false,
+      "domain": "switch",
+      "service": "turn_off",
+      "areaId": [],
+      "deviceId": [],
+      "entityId": [
+        "switch.side_2_feeder_pump"
+      ],
+      "data": "",
+      "dataType": "jsonata",
+      "mergeContext": "",
+      "mustacheAltTags": false,
+      "outputProperties": [],
+      "queue": "none",
+      "x": 1440,
+      "y": 120,
+      "wires": [
+        [
+          "c5dc2704751edb87"
+        ]
+      ]
+    },
+    {
+      "id": "c5dc2704751edb87",
+      "type": "ha-wait-until",
+      "z": "e9ac4911b30dde89",
+      "name": "Is pump still off",
+      "server": "",
+      "version": 2,
+      "outputs": 2,
+      "entityId": "switch.side_2_feeder_pump",
+      "entityIdFilterType": "exact",
+      "property": "state",
+      "comparator": "is",
+      "value": "off",
+      "valueType": "str",
+      "timeout": "1",
+      "timeoutType": "num",
+      "timeoutUnits": "seconds",
+      "checkCurrentState": true,
+      "blockInputOverrides": true,
+      "outputProperties": [],
+      "entityLocation": "data",
+      "entityLocationType": "none",
+      "x": 1560,
+      "y": 40,
+      "wires": [
+        [],
+        [
+          "4c27f3579409e384"
+        ]
+      ]
+    }
+  ]
