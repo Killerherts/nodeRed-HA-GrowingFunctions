@@ -1,723 +1,807 @@
 [
-    {
-        "id": "ef59bddc391216d0",
-        "type": "function",
-        "z": "2a2ba6c667bbf475",
-        "name": "function 8",
-        "func": "// Constants\nconst SECONDS_IN_DAY = 24 * 60 * 60;\nconst MIN_IRRIGATION_FREQUENCY = 10 * 60; // 10 minutes in seconds\nconst DESIRED_MOISTURE = 42; // Desired moisture level in water content percentage\nconst P1_THRESHOLD = 2;\nconst P2_THRESHOLD = 5;\nconst MAX_DELTA = 20;\n\n// Retrieve necessary data from Home Assistant\nlet generative = getHAState('input_boolean.generative_steering_side1') === 'on';\nlet flipToFlower = getHAState('input_boolean.flip_to_flower_side1') === 'on';\nlet lightOnTime = convertTime(getHAState('input_datetime.lights_on_time_side1'));\nlet soilMoisture = parseFloat(getHAState('sensor.soilsensor_moisture_wc'));\nlet last2SoilMoistureReadings = getLast2SoilMoistureReadings();\nlet maintenancePhase = getHAState('input_boolean.side_1_maintaince_phase') === 'on';\nlet currentTime = getCurrentTime();\nlet currentTimeUTC = getCurrentTimeUTC();\nlet timeSinceLastIrrigation;\n\n// Calculate parameters\nlet dryBackThreshold = DESIRED_MOISTURE - 3;\nlet lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);\nlet irrigationStart = calculateIrrigationStart(generative, lightOnTime);\nlet irrigationEnd = calculateIrrigationEnd(lightOffTime);\nlet lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.states['switch.side_1_feeder_pump'].last_changed).getTime();\nlet lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);\nlet inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);\nlet soilMoistureChange = calculateSoilMoistureChange(soilMoisture, last2SoilMoistureReadings[1]);\nnode.warn(soilMoistureChange)\n//node.warn('last changed time ' + lastChanged)\n//node.warn('current time utc ' + currentTimeUTC)\n\nif (lastChanged < currentTimeUTC) {\n    timeSinceLastIrrigation = Math.floor(currentTimeUTC - lastChanged);\n} else {\n    timeSinceLastIrrigation = Math.floor((SECONDS_IN_DAY - lastChanged) + currentTimeUTC);\n}\n\n\nnode.warn('time since last irrigation ' + timeSinceLastIrrigation);\n\n// Function to get current time in UTC seconds\nfunction getCurrentTimeUTC() {\n    const now = new Date();\n    const utcSeconds = (now.getUTCHours() * 3600) + (now.getUTCMinutes() * 60) + now.getUTCSeconds();\n    return utcSeconds;\n}\n\n\nfunction convert_epoch_to_utc_seconds(epoch_ms) {\n    const epoch_seconds = epoch_ms / 1000;\n    const seconds_into_day_utc = Math.floor(epoch_seconds % SECONDS_IN_DAY);\n    return seconds_into_day_utc;\n}\n\n\n// Function to convert time\nfunction convertTime(timeString) {\n    let time;\n    let isUtc = false;\n\n    if (!timeString) {\n        time = new Date();\n    } else {\n        time = new Date(timeString);\n        isUtc = timeString.includes(\"Z\") || timeString.includes(\"+\") || timeString.includes(\"-\");\n        if (isNaN(time.getTime())) {\n            time = new Date(\"1970-01-01T\" + timeString + \"Z\");\n            isUtc = true;\n        }\n    }\n\n    let hours, minutes, seconds;\n    if (isUtc) {\n        hours = time.getUTCHours();\n        minutes = time.getUTCMinutes();\n        seconds = time.getUTCSeconds();\n    } else {\n        hours = time.getHours();\n        minutes = time.getMinutes();\n        seconds = time.getSeconds();\n    }\n    return parseInt(hours * 60 * 60) + parseInt(minutes * 60) + parseInt(seconds);\n}\n\n// Function to retrieve state from Home Assistant\nfunction getHAState(state) {\n    return global.get('homeassistant').homeAssistant.states[state].state;\n}\n\n\n\n// Function to get current time in seconds\nfunction getCurrentTime() {\n    const now = new Date();\n    return now.getSeconds() + (60 * (now.getMinutes() + 60 * now.getHours()));\n}\n\n\n// Function to calculate light off time\nfunction calculateLightOffTime(flipToFlower, lightOnTime) {\n    return flipToFlower ? lightOnTime + 12 * 60 * 60 : lightOnTime + 18 * 60 * 60;\n}\n\n// Function to calculate irrigation start time dynamically based on lights on time\nfunction calculateIrrigationStart(generative, lightOnTime) {\n    let irrigationStart = lightOnTime;\n\n    if (generative) {\n        irrigationStart += 2 * 60 * 60; // Add 2 hours for generative steering\n    } else {\n        // Use a default start time if generative is not enabled\n        irrigationStart += 60 * 60; // Add 1 hour\n    }\n\n    return irrigationStart;\n}\n\n// Function to calculate irrigation end time dynamically based on light off time\nfunction calculateIrrigationEnd(lightOffTime) {\n    return (lightOffTime - 60 * 60) % SECONDS_IN_DAY;\n}\n\n// Function to check if current time is in irrigation window\nfunction checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {\n    if (irrigationStart > irrigationEnd) {\n        return currentTime >= irrigationStart || currentTime <= irrigationEnd;\n    } else {\n        return currentTime >= irrigationStart && currentTime <= irrigationEnd;\n    }\n}\n\n// Function to calculate soil moisture change\nfunction calculateSoilMoistureChange(soilMoisture, lastSoilMoisture) {\n    return soilMoisture - lastSoilMoisture;\n}\n\n// Checks if the last two readings are within 2 percent of the desired moisture\nfunction checkLast2ReadingsCloseToDesired(desired, readings) {\n    let closeToDesired = readings.every(reading => Math.abs(reading - desired) <= 2);\n    return closeToDesired;\n}\n\n// Function to retrieve last 2 soil moisture readings and convert to an array of numbers\nfunction getLast2SoilMoistureReadings() {\n    let readingsStr = getHAState('input_text.side_1_last_2_soil_wc');\n    let readingsArr;\n\n    try {\n        readingsArr = JSON.parse(readingsStr);  // Convert string back to array\n    } catch (e) {\n        node.warn(\"Failed to parse last 2 soil moisture readings: \" + e);\n        readingsArr = [soilMoisture, soilMoisture];  // Default value in case of error\n    }\n\n    // Check if any reading is NaN, if so replace it with current soil moisture\n    for (let i = 0; i < readingsArr.length; i++) {\n        if (isNaN(readingsArr[i])) {\n            readingsArr[i] = soilMoisture;\n        }\n    }\n    node.warn(readingsArr)\n    return readingsArr;\n}\n\n// Function to log debug data\nfunction logDebugData() {\n    node.warn(\"inIrrigationWindow: \" + inIrrigationWindow);\n    node.warn(\"Generative: \" + generative);\n    node.warn(\"Flip to flower: \" + flipToFlower);\n    node.warn(\"Soil moisture: \" + soilMoisture);\n    node.warn(\"Last 2 soil moisture: \" + last2SoilMoistureReadings);\n    node.warn(\"Current time: \" + currentTime);\n    node.warn(\"Irrigation start time: \" + irrigationStart);\n    node.warn(\"Irrigation end time: \" + irrigationEnd);\n    node.warn(\"last Irrigation Run \" + lastChanged)\n}\n\n\n// Process control flow\nfunction processControlFlow() {\n    if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {\n        node.warn(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);\n        return [null, null, null, null, null];\n    }\n\n    if (Math.abs(soilMoistureChange) > MAX_DELTA) {\n        node.warn(`Delta of soil moisture is greater than ${MAX_DELTA}%. Outputting to a new 4th return.`);\n        return [null, null, null, null, { payload: JSON.stringify(last2SoilMoistureReadings) }];\n    }\n\n    if (inIrrigationWindow) {\n        if (!maintenancePhase) {\n            if (soilMoisture < DESIRED_MOISTURE && !checkLast2ReadingsCloseToDesired(DESIRED_MOISTURE, last2SoilMoistureReadings)) {\n                last2SoilMoistureReadings.push(soilMoisture);\n                if (last2SoilMoistureReadings.length > 2) {\n                    last2SoilMoistureReadings.shift();\n                }\n                node.warn('P1 feed');\n                return [{ payload: JSON.stringify(last2SoilMoistureReadings) }, null, null, null, null];\n            } else if (checkLast2ReadingsCloseToDesired(DESIRED_MOISTURE, last2SoilMoistureReadings)) {\n                // If last two readings are within 2 percent, switch the maintenancePhase to true\n                node.warn('P2 Flip Switch');\n                return [null, null, null, { payload: \"Start P2\" }, null];\n            }\n        }\n        if (soilMoistureChange > P2_THRESHOLD && maintenancePhase) {\n            last2SoilMoistureReadings.push(soilMoisture);\n            if (last2SoilMoistureReadings.length > 2) {\n                last2SoilMoistureReadings.shift();\n            }\n            node.warn('P2 feed');\n            return [null, { payload: JSON.stringify(last2SoilMoistureReadings) }, null, null, null];\n        }\n    } else {\n        // Handles the over midnight irrigation window scenario\n        if ((irrigationStart < irrigationEnd && (currentTime > irrigationEnd || currentTime < irrigationStart)) ||\n            (irrigationStart > irrigationEnd && !(currentTime > irrigationStart && currentTime < irrigationEnd))) {\n            node.warn(`Outside of irrigation window. Resetting Maintenance Switch for New day.`);\n            return [null, null, { payload: 'reset switch' }, null, null];\n        } else {\n            node.warn(`Soil Moisture within desired range`);\n            return [null, null, null, null, null];\n        }\n    }\n}\n\n//run\n//logDebugData();\n// Run the debug function\n//return processControlFlowDebug();\nreturn processControlFlow();",
-        "outputs": 5,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 320,
-        "y": 540,
-        "wires": [
-            [
-                "da86350d25b27733",
-                "f4eedb2b4ffdbd03"
-            ],
-            [
-                "da86350d25b27733",
-                "8563079f8c2222dd"
-            ],
-            [
-                "6e6c6c3b240b1a78"
-            ],
-            [
-                "e5e117e13644e5f5"
-            ],
-            [
-                "fd5b2a802727750c"
-            ]
-        ],
-        "outputLabels": [
-            "P1 Feed",
-            "P2 Feed",
-            "P3 Reset ",
-            "Flip P2 Switch on",
-            "Max Delta"
-        ]
-    },
-    {
-        "id": "10644fa2c9c4331e",
-        "type": "inject",
-        "z": "2a2ba6c667bbf475",
-        "name": "",
-        "props": [
-            {
-                "p": "payload"
-            },
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
-        "repeat": "240",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "",
-        "payloadType": "date",
-        "x": 130,
-        "y": 540,
-        "wires": [
-            [
-                "ef59bddc391216d0"
-            ]
-        ]
-    },
-    {
-        "id": "da86350d25b27733",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Set input Text",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "input_text",
-        "service": "set_value",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "input_text.side_1_last_2_soil_wc"
-        ],
-        "data": "{ \"value\": payload }",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 700,
-        "y": 500,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "f4eedb2b4ffdbd03",
-        "type": "api-current-state",
-        "z": "2a2ba6c667bbf475",
-        "name": "Should Skip Next Feed",
-        "server": "b3a85bf1.166a08",
-        "version": 3,
-        "outputs": 2,
-        "halt_if": "off",
-        "halt_if_type": "str",
-        "halt_if_compare": "is",
-        "entity_id": "input_boolean.skip_next_feed_side1",
-        "state_type": "str",
-        "blockInputOverrides": false,
-        "outputProperties": [
-            {
-                "property": "payload",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "entityState"
-            },
-            {
-                "property": "data",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "entity"
-            }
-        ],
-        "for": "0",
-        "forType": "num",
-        "forUnits": "minutes",
-        "override_topic": false,
-        "state_location": "payload",
-        "override_payload": "msg",
-        "entity_location": "data",
-        "override_data": "msg",
-        "x": 940,
-        "y": 540,
-        "wires": [
-            [
-                "f9e488a913e6cd71"
-            ],
-            [
-                "1d1ec58427fee2bf"
-            ]
-        ]
-    },
-    {
-        "id": "8563079f8c2222dd",
-        "type": "api-current-state",
-        "z": "2a2ba6c667bbf475",
-        "name": "Should Skip Next Feed",
-        "server": "b3a85bf1.166a08",
-        "version": 3,
-        "outputs": 2,
-        "halt_if": "off",
-        "halt_if_type": "str",
-        "halt_if_compare": "is",
-        "entity_id": "input_boolean.skip_next_feed_side1",
-        "state_type": "str",
-        "blockInputOverrides": false,
-        "outputProperties": [
-            {
-                "property": "payload",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "entityState"
-            },
-            {
-                "property": "data",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "entity"
-            }
-        ],
-        "for": "0",
-        "forType": "num",
-        "forUnits": "minutes",
-        "override_topic": false,
-        "state_location": "payload",
-        "override_payload": "msg",
-        "entity_location": "data",
-        "override_data": "msg",
-        "x": 1060,
-        "y": 660,
-        "wires": [
-            [
-                "1450e56bf1b0b53b"
-            ],
-            [
-                "87725a9930be48ab"
-            ]
-        ]
-    },
-    {
-        "id": "6e6c6c3b240b1a78",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "input_boolean",
-        "service": "turn_off",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "input_boolean.side_1_maintaince_phase"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 480,
-        "y": 680,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "e5e117e13644e5f5",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "input_boolean",
-        "service": "turn_on",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "input_boolean.side_1_maintaince_phase"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 680,
-        "y": 600,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "fd5b2a802727750c",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Set input Text",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "input_text",
-        "service": "set_value",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "input_text.side_1_last_2_soil_wc"
-        ],
-        "data": "{ \"value\": payload.}",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 760,
-        "y": 680,
-        "wires": [
-            [
-                "6ff420d84c66ddff"
-            ]
-        ]
-    },
-    {
-        "id": "f9e488a913e6cd71",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn on Feeder",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "switch",
-        "service": "turn_on",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "switch.side_1_feeder_pump"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1280,
-        "y": 520,
-        "wires": [
-            [
-                "f7710ad351ad21b7"
-            ]
-        ]
-    },
-    {
-        "id": "1d1ec58427fee2bf",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn off Skip Next Feed",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "input_boolean",
-        "service": "turn_off",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "input_boolean.skip_next_feed"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1290,
-        "y": 580,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "1450e56bf1b0b53b",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn on Feeder",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "switch",
-        "service": "turn_on",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "switch.side_1_feeder_pump"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1300,
-        "y": 640,
-        "wires": [
-            [
-                "e259bb527f9e990d"
-            ]
-        ]
-    },
-    {
-        "id": "87725a9930be48ab",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn off Skip Next Feed",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "input_boolean",
-        "service": "turn_off",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "input_boolean.skip_next_feed"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1350,
-        "y": 700,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "6ff420d84c66ddff",
-        "type": "api-current-state",
-        "z": "2a2ba6c667bbf475",
-        "name": "Should Skip Next Feed",
-        "server": "b3a85bf1.166a08",
-        "version": 3,
-        "outputs": 2,
-        "halt_if": "off",
-        "halt_if_type": "str",
-        "halt_if_compare": "is",
-        "entity_id": "input_boolean.skip_next_feed_side1",
-        "state_type": "str",
-        "blockInputOverrides": false,
-        "outputProperties": [
-            {
-                "property": "payload",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "entityState"
-            },
-            {
-                "property": "data",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "entity"
-            }
-        ],
-        "for": "0",
-        "forType": "num",
-        "forUnits": "minutes",
-        "override_topic": false,
-        "state_location": "payload",
-        "override_payload": "msg",
-        "entity_location": "data",
-        "override_data": "msg",
-        "x": 1000,
-        "y": 700,
-        "wires": [
-            [
-                "823adf3996d79edc"
-            ],
-            [
-                "0dc14c4837b001c7"
-            ]
-        ]
-    },
-    {
-        "id": "89cfe1f788cc7f55",
-        "type": "server-state-changed",
-        "z": "2a2ba6c667bbf475",
-        "name": "Water Side 1 Button",
-        "server": "b3a85bf1.166a08",
-        "version": 4,
-        "exposeToHomeAssistant": false,
-        "haConfig": [
-            {
-                "property": "name",
-                "value": ""
-            },
-            {
-                "property": "icon",
-                "value": ""
-            }
-        ],
-        "entityidfilter": "input_button.water_veg_side_table",
-        "entityidfiltertype": "exact",
-        "outputinitially": false,
-        "state_type": "str",
-        "haltifstate": "",
-        "halt_if_type": "str",
-        "halt_if_compare": "is",
-        "outputs": 1,
-        "output_only_on_state_change": true,
-        "for": "0",
-        "forType": "num",
-        "forUnits": "minutes",
-        "ignorePrevStateNull": false,
-        "ignorePrevStateUnknown": false,
-        "ignorePrevStateUnavailable": false,
-        "ignoreCurrentStateUnknown": false,
-        "ignoreCurrentStateUnavailable": false,
-        "outputProperties": [
-            {
-                "property": "payload",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "entityState"
-            },
-            {
-                "property": "data",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "eventData"
-            },
-            {
-                "property": "topic",
-                "propertyType": "msg",
-                "value": "",
-                "valueType": "triggerId"
-            }
-        ],
-        "x": 1110,
-        "y": 460,
-        "wires": [
-            [
-                "f9e488a913e6cd71"
-            ]
-        ]
-    },
-    {
-        "id": "f7710ad351ad21b7",
-        "type": "delay",
-        "z": "2a2ba6c667bbf475",
-        "name": "",
-        "pauseType": "delay",
-        "timeout": "10",
-        "timeoutUnits": "seconds",
-        "rate": "1",
-        "nbRateUnits": "1",
-        "rateUnits": "second",
-        "randomFirst": "1",
-        "randomLast": "5",
-        "randomUnits": "seconds",
-        "drop": false,
-        "allowrate": false,
-        "outputs": 1,
-        "x": 1500,
-        "y": 460,
-        "wires": [
-            [
-                "de7fbb567d9b5e4b"
-            ]
-        ]
-    },
-    {
-        "id": "e259bb527f9e990d",
-        "type": "delay",
-        "z": "2a2ba6c667bbf475",
-        "name": "",
-        "pauseType": "delay",
-        "timeout": "10",
-        "timeoutUnits": "seconds",
-        "rate": "1",
-        "nbRateUnits": "1",
-        "rateUnits": "second",
-        "randomFirst": "1",
-        "randomLast": "5",
-        "randomUnits": "seconds",
-        "drop": false,
-        "allowrate": false,
-        "outputs": 1,
-        "x": 1480,
-        "y": 640,
-        "wires": [
-            [
-                "0f1e93ceaa6e4393"
-            ]
-        ]
-    },
-    {
-        "id": "823adf3996d79edc",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn on Feeder",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "switch",
-        "service": "turn_on",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "switch.side_1_feeder_pump"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1220,
-        "y": 740,
-        "wires": [
-            [
-                "7d67b404ad607a1b"
-            ]
-        ]
-    },
-    {
-        "id": "0dc14c4837b001c7",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn off Skip Next Feed",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "input_boolean",
-        "service": "turn_off",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "input_boolean.skip_next_feed"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 970,
-        "y": 800,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "de7fbb567d9b5e4b",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn off Feeder",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "switch",
-        "service": "turn_off",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "switch.side_1_feeder_pump"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1580,
-        "y": 540,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "0f1e93ceaa6e4393",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn off Feeder",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "switch",
-        "service": "turn_off",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "switch.side_1_feeder_pump"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1660,
-        "y": 640,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "7d67b404ad607a1b",
-        "type": "delay",
-        "z": "2a2ba6c667bbf475",
-        "name": "",
-        "pauseType": "delay",
-        "timeout": "6",
-        "timeoutUnits": "seconds",
-        "rate": "1",
-        "nbRateUnits": "1",
-        "rateUnits": "second",
-        "randomFirst": "1",
-        "randomLast": "5",
-        "randomUnits": "seconds",
-        "drop": false,
-        "allowrate": false,
-        "outputs": 1,
-        "x": 1400,
-        "y": 740,
-        "wires": [
-            [
-                "1df57f9b2b56a0cb"
-            ]
-        ]
-    },
-    {
-        "id": "1df57f9b2b56a0cb",
-        "type": "api-call-service",
-        "z": "2a2ba6c667bbf475",
-        "name": "Turn off Feeder",
-        "server": "b3a85bf1.166a08",
-        "version": 5,
-        "debugenabled": false,
-        "domain": "switch",
-        "service": "turn_off",
-        "areaId": [],
-        "deviceId": [],
-        "entityId": [
-            "switch.side_1_feeder_pump"
-        ],
-        "data": "",
-        "dataType": "jsonata",
-        "mergeContext": "",
-        "mustacheAltTags": false,
-        "outputProperties": [],
-        "queue": "none",
-        "x": 1540,
-        "y": 800,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "b3a85bf1.166a08",
-        "type": "server",
-        "name": "Home Assistant",
-        "addon": true,
-        "rejectUnauthorizedCerts": true,
-        "ha_boolean": "",
-        "connectionDelay": false,
-        "cacheJson": true,
-        "heartbeat": false,
-        "heartbeatInterval": "",
-        "statusSeparator": "",
-        "enableGlobalContextStore": true
-    }
+   {
+      "id":"ef59bddc391216d0",
+      "type":"function",
+      "z":"2a2ba6c667bbf475",
+      "name":"function 8",
+      "func":"// Constants\nconst SECONDS_IN_DAY = 24 * 60 * 60;\nconst MIN_IRRIGATION_FREQUENCY = 10 * 60; // 10 minutes in seconds\nconst DESIRED_MOISTURE = 42; // Desired moisture level in water content percentage\nconst P1_THRESHOLD = 2;\nconst P2_THRESHOLD = 5;\nconst MAX_DELTA = 20;\n\n// Retrieve necessary data from Home Assistant\nlet generative = getHAState('input_boolean.generative_steering_side1') === 'on';\nlet flipToFlower = getHAState('input_boolean.flip_to_flower_side1') === 'on';\nlet lightOnTime = convertTime(getHAState('input_datetime.lights_on_time_side1'));\nlet soilMoisture = parseFloat(getHAState('sensor.soilsensor_moisture_wc'));\nlet last2SoilMoistureReadings = getLast2SoilMoistureReadings();\nlet maintenancePhase = getHAState('input_boolean.side_1_maintaince_phase') === 'on';\nlet currentTime = getCurrentTime();\nlet currentTimeUTC = getCurrentTimeUTC();\nlet timeSinceLastIrrigation;\n\n// Calculate parameters\nlet dryBackThreshold = DESIRED_MOISTURE - 3;\nlet lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);\nlet irrigationStart = calculateIrrigationStart(generative, lightOnTime);\nlet irrigationEnd = calculateIrrigationEnd(lightOffTime);\nlet lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.states['switch.side_1_feeder_pump'].last_changed).getTime();\nlet lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);\nlet inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);\nlet soilMoistureChange = calculateSoilMoistureChange(soilMoisture, last2SoilMoistureReadings[1]);\nnode.warn(soilMoistureChange)\n//node.warn('last changed time ' + lastChanged)\n//node.warn('current time utc ' + currentTimeUTC)\n\nif (lastChanged < currentTimeUTC) {\n    timeSinceLastIrrigation = Math.floor(currentTimeUTC - lastChanged);\n} else {\n    timeSinceLastIrrigation = Math.floor((SECONDS_IN_DAY - lastChanged) + currentTimeUTC);\n}\n\n\nnode.warn('time since last irrigation ' + timeSinceLastIrrigation);\n\n// Function to get current time in UTC seconds\nfunction getCurrentTimeUTC() {\n    const now = new Date();\n    const utcSeconds = (now.getUTCHours() * 3600) + (now.getUTCMinutes() * 60) + now.getUTCSeconds();\n    return utcSeconds;\n}\n\n\nfunction convert_epoch_to_utc_seconds(epoch_ms) {\n    const epoch_seconds = epoch_ms / 1000;\n    const seconds_into_day_utc = Math.floor(epoch_seconds % SECONDS_IN_DAY);\n    return seconds_into_day_utc;\n}\n\n\n// Function to convert time\nfunction convertTime(timeString) {\n    let time;\n    let isUtc = false;\n\n    if (!timeString) {\n        time = new Date();\n    } else {\n        time = new Date(timeString);\n        isUtc = timeString.includes(\"Z\") || timeString.includes(\"+\") || timeString.includes(\"-\");\n        if (isNaN(time.getTime())) {\n            time = new Date(\"1970-01-01T\" + timeString + \"Z\");\n            isUtc = true;\n        }\n    }\n\n    let hours, minutes, seconds;\n    if (isUtc) {\n        hours = time.getUTCHours();\n        minutes = time.getUTCMinutes();\n        seconds = time.getUTCSeconds();\n    } else {\n        hours = time.getHours();\n        minutes = time.getMinutes();\n        seconds = time.getSeconds();\n    }\n    return parseInt(hours * 60 * 60) + parseInt(minutes * 60) + parseInt(seconds);\n}\n\n// Function to retrieve state from Home Assistant\nfunction getHAState(state) {\n    return global.get('homeassistant').homeAssistant.states[state].state;\n}\n\n\n\n// Function to get current time in seconds\nfunction getCurrentTime() {\n    const now = new Date();\n    return now.getSeconds() + (60 * (now.getMinutes() + 60 * now.getHours()));\n}\n\n\n// Function to calculate light off time\nfunction calculateLightOffTime(flipToFlower, lightOnTime) {\n    return flipToFlower ? lightOnTime + 12 * 60 * 60 : lightOnTime + 18 * 60 * 60;\n}\n\n// Function to calculate irrigation start time dynamically based on lights on time\nfunction calculateIrrigationStart(generative, lightOnTime) {\n    let irrigationStart = lightOnTime;\n\n    if (generative) {\n        irrigationStart += 2 * 60 * 60; // Add 2 hours for generative steering\n    } else {\n        // Use a default start time if generative is not enabled\n        irrigationStart += 60 * 60; // Add 1 hour\n    }\n\n    return irrigationStart;\n}\n\n// Function to calculate irrigation end time dynamically based on light off time\nfunction calculateIrrigationEnd(lightOffTime) {\n    return (lightOffTime - 60 * 60) % SECONDS_IN_DAY;\n}\n\n// Function to check if current time is in irrigation window\nfunction checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {\n    if (irrigationStart > irrigationEnd) {\n        return currentTime >= irrigationStart || currentTime <= irrigationEnd;\n    } else {\n        return currentTime >= irrigationStart && currentTime <= irrigationEnd;\n    }\n}\n\n// Function to calculate soil moisture change\nfunction calculateSoilMoistureChange(soilMoisture, lastSoilMoisture) {\n    return soilMoisture - lastSoilMoisture;\n}\n\n// Checks if the last two readings are within 2 percent of the desired moisture\nfunction checkLast2ReadingsCloseToDesired(desired, readings) {\n    let closeToDesired = readings.every(reading => Math.abs(reading - desired) <= 2);\n    return closeToDesired;\n}\n\n// Function to retrieve last 2 soil moisture readings and convert to an array of numbers\nfunction getLast2SoilMoistureReadings() {\n    let readingsStr = getHAState('input_text.side_1_last_2_soil_wc');\n    let readingsArr;\n\n    try {\n        readingsArr = JSON.parse(readingsStr);  // Convert string back to array\n    } catch (e) {\n        node.warn(\"Failed to parse last 2 soil moisture readings: \" + e);\n        readingsArr = [soilMoisture, soilMoisture];  // Default value in case of error\n    }\n\n    // Check if any reading is NaN, if so replace it with current soil moisture\n    for (let i = 0; i < readingsArr.length; i++) {\n        if (isNaN(readingsArr[i])) {\n            readingsArr[i] = soilMoisture;\n        }\n    }\n    node.warn(readingsArr)\n    return readingsArr;\n}\n\n// Function to log debug data\nfunction logDebugData() {\n    node.warn(\"inIrrigationWindow: \" + inIrrigationWindow);\n    node.warn(\"Generative: \" + generative);\n    node.warn(\"Flip to flower: \" + flipToFlower);\n    node.warn(\"Soil moisture: \" + soilMoisture);\n    node.warn(\"Last 2 soil moisture: \" + last2SoilMoistureReadings);\n    node.warn(\"Current time: \" + currentTime);\n    node.warn(\"Irrigation start time: \" + irrigationStart);\n    node.warn(\"Irrigation end time: \" + irrigationEnd);\n    node.warn(\"last Irrigation Run \" + lastChanged)\n}\n\n\n// Process control flow\nfunction processControlFlow() {\n    if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {\n        node.warn(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);\n        return [null, null, null, null, null];\n    }\n\n    if (Math.abs(soilMoistureChange) > MAX_DELTA) {\n        node.warn(`Delta of soil moisture is greater than ${MAX_DELTA}%. Outputting to a new 4th return.`);\n        return [null, null, null, null, { payload: JSON.stringify(last2SoilMoistureReadings) }];\n    }\n\n    if (inIrrigationWindow) {\n        if (!maintenancePhase) {\n            if (soilMoisture < DESIRED_MOISTURE && !checkLast2ReadingsCloseToDesired(DESIRED_MOISTURE, last2SoilMoistureReadings)) {\n                last2SoilMoistureReadings.push(soilMoisture);\n                if (last2SoilMoistureReadings.length > 2) {\n                    last2SoilMoistureReadings.shift();\n                }\n                node.warn('P1 feed');\n                return [{ payload: JSON.stringify(last2SoilMoistureReadings) }, null, null, null, null];\n            } else if (checkLast2ReadingsCloseToDesired(DESIRED_MOISTURE, last2SoilMoistureReadings)) {\n                // If last two readings are within 2 percent, switch the maintenancePhase to true\n                node.warn('P2 Flip Switch');\n                return [null, null, null, { payload: \"Start P2\" }, null];\n            }\n        }\n        if (soilMoistureChange > P2_THRESHOLD && maintenancePhase) {\n            last2SoilMoistureReadings.push(soilMoisture);\n            if (last2SoilMoistureReadings.length > 2) {\n                last2SoilMoistureReadings.shift();\n            }\n            node.warn('P2 feed');\n            return [null, { payload: JSON.stringify(last2SoilMoistureReadings) }, null, null, null];\n        }\n    } else {\n        // Handles the over midnight irrigation window scenario\n        if ((irrigationStart < irrigationEnd && (currentTime > irrigationEnd || currentTime < irrigationStart)) ||\n            (irrigationStart > irrigationEnd && !(currentTime > irrigationStart && currentTime < irrigationEnd))) {\n            node.warn(`Outside of irrigation window. Resetting Maintenance Switch for New day.`);\n            return [null, null, { payload: 'reset switch' }, null, null];\n        } else {\n            node.warn(`Soil Moisture within desired range`);\n            return [null, null, null, null, null];\n        }\n    }\n}\n\n//run\n//logDebugData();\n// Run the debug function\n//return processControlFlowDebug();\nreturn processControlFlow();",
+      "outputs":5,
+      "noerr":0,
+      "initialize":"",
+      "finalize":"",
+      "libs":[
+         
+      ],
+      "x":320,
+      "y":540,
+      "wires":[
+         [
+            "da86350d25b27733",
+            "f4eedb2b4ffdbd03"
+         ],
+         [
+            "da86350d25b27733",
+            "8563079f8c2222dd"
+         ],
+         [
+            "6e6c6c3b240b1a78"
+         ],
+         [
+            "e5e117e13644e5f5"
+         ],
+         [
+            "fd5b2a802727750c"
+         ]
+      ],
+      "outputLabels":[
+         "P1 Feed",
+         "P2 Feed",
+         "P3 Reset ",
+         "Flip P2 Switch on",
+         "Max Delta"
+      ]
+   },
+   {
+      "id":"10644fa2c9c4331e",
+      "type":"inject",
+      "z":"2a2ba6c667bbf475",
+      "name":"",
+      "props":[
+         {
+            "p":"payload"
+         },
+         {
+            "p":"topic",
+            "vt":"str"
+         }
+      ],
+      "repeat":"240",
+      "crontab":"",
+      "once":false,
+      "onceDelay":0.1,
+      "topic":"",
+      "payload":"",
+      "payloadType":"date",
+      "x":130,
+      "y":540,
+      "wires":[
+         [
+            "ef59bddc391216d0"
+         ]
+      ]
+   },
+   {
+      "id":"da86350d25b27733",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Set input Text",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"input_text",
+      "service":"set_value",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "input_text.side_1_last_2_soil_wc"
+      ],
+      "data":"{ \"value\": payload }",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":700,
+      "y":500,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"f4eedb2b4ffdbd03",
+      "type":"api-current-state",
+      "z":"2a2ba6c667bbf475",
+      "name":"Should Skip Next Feed",
+      "server":"xxxxx",
+      "version":3,
+      "outputs":2,
+      "halt_if":"off",
+      "halt_if_type":"str",
+      "halt_if_compare":"is",
+      "entity_id":"input_boolean.skip_next_feed_side1",
+      "state_type":"str",
+      "blockInputOverrides":false,
+      "outputProperties":[
+         {
+            "property":"payload",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"entityState"
+         },
+         {
+            "property":"data",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"entity"
+         }
+      ],
+      "for":"0",
+      "forType":"num",
+      "forUnits":"minutes",
+      "override_topic":false,
+      "state_location":"payload",
+      "override_payload":"msg",
+      "entity_location":"data",
+      "override_data":"msg",
+      "x":940,
+      "y":540,
+      "wires":[
+         [
+            "f9e488a913e6cd71"
+         ],
+         [
+            "1d1ec58427fee2bf"
+         ]
+      ]
+   },
+   {
+      "id":"8563079f8c2222dd",
+      "type":"api-current-state",
+      "z":"2a2ba6c667bbf475",
+      "name":"Should Skip Next Feed",
+      "server":"xxxxx",
+      "version":3,
+      "outputs":2,
+      "halt_if":"off",
+      "halt_if_type":"str",
+      "halt_if_compare":"is",
+      "entity_id":"input_boolean.skip_next_feed_side1",
+      "state_type":"str",
+      "blockInputOverrides":false,
+      "outputProperties":[
+         {
+            "property":"payload",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"entityState"
+         },
+         {
+            "property":"data",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"entity"
+         }
+      ],
+      "for":"0",
+      "forType":"num",
+      "forUnits":"minutes",
+      "override_topic":false,
+      "state_location":"payload",
+      "override_payload":"msg",
+      "entity_location":"data",
+      "override_data":"msg",
+      "x":1060,
+      "y":660,
+      "wires":[
+         [
+            "1450e56bf1b0b53b"
+         ],
+         [
+            "87725a9930be48ab"
+         ]
+      ]
+   },
+   {
+      "id":"6e6c6c3b240b1a78",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"input_boolean",
+      "service":"turn_off",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "input_boolean.side_1_maintaince_phase"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":480,
+      "y":680,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"e5e117e13644e5f5",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"input_boolean",
+      "service":"turn_on",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "input_boolean.side_1_maintaince_phase"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":680,
+      "y":600,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"fd5b2a802727750c",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Set input Text",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"input_text",
+      "service":"set_value",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "input_text.side_1_last_2_soil_wc"
+      ],
+      "data":"{ \"value\": payload.}",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":760,
+      "y":680,
+      "wires":[
+         [
+            "6ff420d84c66ddff"
+         ]
+      ]
+   },
+   {
+      "id":"f9e488a913e6cd71",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn on Feeder",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"switch",
+      "service":"turn_on",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "switch.side_1_feeder_pump"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1280,
+      "y":520,
+      "wires":[
+         [
+            "f7710ad351ad21b7"
+         ]
+      ]
+   },
+   {
+      "id":"1d1ec58427fee2bf",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn off Skip Next Feed",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"input_boolean",
+      "service":"turn_off",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "input_boolean.skip_next_feed"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1290,
+      "y":580,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"1450e56bf1b0b53b",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn on Feeder",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"switch",
+      "service":"turn_on",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "switch.side_1_feeder_pump"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1300,
+      "y":640,
+      "wires":[
+         [
+            "e259bb527f9e990d"
+         ]
+      ]
+   },
+   {
+      "id":"87725a9930be48ab",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn off Skip Next Feed",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"input_boolean",
+      "service":"turn_off",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "input_boolean.skip_next_feed"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1350,
+      "y":700,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"6ff420d84c66ddff",
+      "type":"api-current-state",
+      "z":"2a2ba6c667bbf475",
+      "name":"Should Skip Next Feed",
+      "server":"xxxxx",
+      "version":3,
+      "outputs":2,
+      "halt_if":"off",
+      "halt_if_type":"str",
+      "halt_if_compare":"is",
+      "entity_id":"input_boolean.skip_next_feed_side1",
+      "state_type":"str",
+      "blockInputOverrides":false,
+      "outputProperties":[
+         {
+            "property":"payload",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"entityState"
+         },
+         {
+            "property":"data",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"entity"
+         }
+      ],
+      "for":"0",
+      "forType":"num",
+      "forUnits":"minutes",
+      "override_topic":false,
+      "state_location":"payload",
+      "override_payload":"msg",
+      "entity_location":"data",
+      "override_data":"msg",
+      "x":1000,
+      "y":700,
+      "wires":[
+         [
+            "823adf3996d79edc"
+         ],
+         [
+            "0dc14c4837b001c7"
+         ]
+      ]
+   },
+   {
+      "id":"89cfe1f788cc7f55",
+      "type":"server-state-changed",
+      "z":"2a2ba6c667bbf475",
+      "name":"Water Side 1 Button",
+      "server":"xxxxx",
+      "version":4,
+      "exposeToHomeAssistant":false,
+      "haConfig":[
+         {
+            "property":"name",
+            "value":""
+         },
+         {
+            "property":"icon",
+            "value":""
+         }
+      ],
+      "entityidfilter":"input_button.water_veg_side_table",
+      "entityidfiltertype":"exact",
+      "outputinitially":false,
+      "state_type":"str",
+      "haltifstate":"",
+      "halt_if_type":"str",
+      "halt_if_compare":"is",
+      "outputs":1,
+      "output_only_on_state_change":true,
+      "for":"0",
+      "forType":"num",
+      "forUnits":"minutes",
+      "ignorePrevStateNull":false,
+      "ignorePrevStateUnknown":false,
+      "ignorePrevStateUnavailable":false,
+      "ignoreCurrentStateUnknown":false,
+      "ignoreCurrentStateUnavailable":false,
+      "outputProperties":[
+         {
+            "property":"payload",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"entityState"
+         },
+         {
+            "property":"data",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"eventData"
+         },
+         {
+            "property":"topic",
+            "propertyType":"msg",
+            "value":"",
+            "valueType":"triggerId"
+         }
+      ],
+      "x":1110,
+      "y":460,
+      "wires":[
+         [
+            "f9e488a913e6cd71"
+         ]
+      ]
+   },
+   {
+      "id":"f7710ad351ad21b7",
+      "type":"delay",
+      "z":"2a2ba6c667bbf475",
+      "name":"",
+      "pauseType":"delay",
+      "timeout":"10",
+      "timeoutUnits":"seconds",
+      "rate":"1",
+      "nbRateUnits":"1",
+      "rateUnits":"second",
+      "randomFirst":"1",
+      "randomLast":"5",
+      "randomUnits":"seconds",
+      "drop":false,
+      "allowrate":false,
+      "outputs":1,
+      "x":1500,
+      "y":460,
+      "wires":[
+         [
+            "de7fbb567d9b5e4b"
+         ]
+      ]
+   },
+   {
+      "id":"e259bb527f9e990d",
+      "type":"delay",
+      "z":"2a2ba6c667bbf475",
+      "name":"",
+      "pauseType":"delay",
+      "timeout":"10",
+      "timeoutUnits":"seconds",
+      "rate":"1",
+      "nbRateUnits":"1",
+      "rateUnits":"second",
+      "randomFirst":"1",
+      "randomLast":"5",
+      "randomUnits":"seconds",
+      "drop":false,
+      "allowrate":false,
+      "outputs":1,
+      "x":1480,
+      "y":640,
+      "wires":[
+         [
+            "0f1e93ceaa6e4393"
+         ]
+      ]
+   },
+   {
+      "id":"823adf3996d79edc",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn on Feeder",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"switch",
+      "service":"turn_on",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "switch.side_1_feeder_pump"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1220,
+      "y":740,
+      "wires":[
+         [
+            "7d67b404ad607a1b"
+         ]
+      ]
+   },
+   {
+      "id":"0dc14c4837b001c7",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn off Skip Next Feed",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"input_boolean",
+      "service":"turn_off",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "input_boolean.skip_next_feed"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":970,
+      "y":800,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"de7fbb567d9b5e4b",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn off Feeder",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"switch",
+      "service":"turn_off",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "switch.side_1_feeder_pump"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1580,
+      "y":540,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"0f1e93ceaa6e4393",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn off Feeder",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"switch",
+      "service":"turn_off",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "switch.side_1_feeder_pump"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1660,
+      "y":640,
+      "wires":[
+         [
+            
+         ]
+      ]
+   },
+   {
+      "id":"7d67b404ad607a1b",
+      "type":"delay",
+      "z":"2a2ba6c667bbf475",
+      "name":"",
+      "pauseType":"delay",
+      "timeout":"6",
+      "timeoutUnits":"seconds",
+      "rate":"1",
+      "nbRateUnits":"1",
+      "rateUnits":"second",
+      "randomFirst":"1",
+      "randomLast":"5",
+      "randomUnits":"seconds",
+      "drop":false,
+      "allowrate":false,
+      "outputs":1,
+      "x":1400,
+      "y":740,
+      "wires":[
+         [
+            "1df57f9b2b56a0cb"
+         ]
+      ]
+   },
+   {
+      "id":"1df57f9b2b56a0cb",
+      "type":"api-call-service",
+      "z":"2a2ba6c667bbf475",
+      "name":"Turn off Feeder",
+      "server":"xxxxx",
+      "version":5,
+      "debugenabled":false,
+      "domain":"switch",
+      "service":"turn_off",
+      "areaId":[
+         
+      ],
+      "deviceId":[
+         
+      ],
+      "entityId":[
+         "switch.side_1_feeder_pump"
+      ],
+      "data":"",
+      "dataType":"jsonata",
+      "mergeContext":"",
+      "mustacheAltTags":false,
+      "outputProperties":[
+         
+      ],
+      "queue":"none",
+      "x":1540,
+      "y":800,
+      "wires":[
+         [
+            
+         ]
+      ]
+   }
 ]
