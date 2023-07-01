@@ -3,7 +3,7 @@ const SECONDS_IN_DAY = 24 * 60 * 60;
 const MIN_IRRIGATION_FREQUENCY = 10 * 60; // 10 minutes in seconds
 const DESIRED_MOISTURE = 42; // Desired moisture level in water content percentage
 const P1_THRESHOLD = 2;
-const P2_THRESHOLD = 5;
+const P2_THRESHOLD = 3;
 const MAX_DELTA = 20;
 
 // Retrieve necessary data from Home Assistant
@@ -21,7 +21,7 @@ let timeSinceLastIrrigation;
 let dryBackThreshold = DESIRED_MOISTURE - 3;
 let lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
-let irrigationEnd = calculateIrrigationEnd(lightOffTime);
+let irrigationEnd = calculateIrrigationEnd(lightOffTime, generative);
 let lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.states['switch.side_1_feeder_pump'].last_changed).getTime();
 let lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);
 let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
@@ -113,12 +113,22 @@ function calculateIrrigationStart(generative, lightOnTime) {
         irrigationStart += 60 * 60; // Add 1 hour
     }
 
-    return irrigationStart;
+    return irrigationStart % SECONDS_IN_DAY;
 }
 
-// Function to calculate irrigation end time dynamically based on light off time
-function calculateIrrigationEnd(lightOffTime) {
-    return (lightOffTime - 60 * 60) % SECONDS_IN_DAY;
+// Function to calculate irrigation end time dynamically based on light off time and generative flag
+function calculateIrrigationEnd(lightOffTime, generative) {
+    let endOffset = generative ? 3 : 1; // Set the offset based on the generative flag
+    let irrigationEnd = (lightOffTime - endOffset * 60 * 60);
+    if (irrigationEnd > 86400) {
+        irrigationEnd = irrigationEnd % SECONDS_IN_DAY; //adjust for run over
+    }
+
+    if (irrigationEnd < 0) {
+        irrigationEnd += SECONDS_IN_DAY; // Adjust the end time if it crosses midnight
+    }
+
+    return irrigationEnd;
 }
 
 // Function to check if current time is in irrigation window
@@ -132,7 +142,7 @@ function checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {
 
 // Function to calculate soil moisture change
 function calculateSoilMoistureChange(soilMoisture, lastSoilMoisture) {
-    return soilMoisture - lastSoilMoisture;
+    return lastSoilMoisture - soilMoisture ;
 }
 
 // Checks if the last two readings are within 2 percent of the desired moisture
@@ -204,23 +214,31 @@ function processControlFlow() {
                 return [null, null, null, { payload: "Start P2" }, null];
             }
         }
-        if (soilMoistureChange > P2_THRESHOLD && maintenancePhase) {
-            last2SoilMoistureReadings.push(soilMoisture);
-            if (last2SoilMoistureReadings.length > 2) {
-                last2SoilMoistureReadings.shift();
+        if (maintenancePhase) {
+            // Calculate the lower moisture level for P2
+            var lowerMoistureLevelP2 = DESIRED_MOISTURE - P2_THRESHOLD;
+
+            // If the soil moisture level is less than the lower limit for P2, it is time to irrigate.
+            if (soilMoisture < lowerMoistureLevelP2) {
+                last2SoilMoistureReadings.push(soilMoisture);
+                if (last2SoilMoistureReadings.length > 2) {
+                    last2SoilMoistureReadings.shift();
+                }
+                node.warn('P2 feed');
+                return [null, { payload: JSON.stringify(last2SoilMoistureReadings) }, null, null, null];
             }
-            node.warn('P2 feed');
-            return [null, { payload: JSON.stringify(last2SoilMoistureReadings) }, null, null, null];
         }
     } else {
+        if (maintenancePhase) {
         // Handles the over midnight irrigation window scenario
-        if ((irrigationStart < irrigationEnd && (currentTime > irrigationEnd || currentTime < irrigationStart)) ||
-            (irrigationStart > irrigationEnd && !(currentTime > irrigationStart && currentTime < irrigationEnd))) {
-            node.warn(`Outside of irrigation window. Resetting Maintenance Switch for New day.`);
-            return [null, null, { payload: 'reset switch' }, null, null];
+            if ((irrigationStart < irrigationEnd && (currentTime > irrigationEnd || currentTime < irrigationStart)) ||
+                (irrigationStart > irrigationEnd && !(currentTime > irrigationStart && currentTime < irrigationEnd))) {
+                node.warn(`Outside of irrigation window. Resetting Maintenance Switch for New day.`);
+                return [null, null, { payload: 'reset switch' }, null, null];
+                }
         } else {
-            node.warn(`Soil Moisture within desired range`);
-            return [null, null, null, null, null];
+            node.warn(`No Action Required`);
+            //return [null, null, null, null, null];
         }
     }
 }
