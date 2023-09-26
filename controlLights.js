@@ -1,5 +1,9 @@
-// Define a global variable for debug logging
-var debugMode = false;
+// Get the Home Assistant object
+const d = global.get('homeassistant').homeAssistant;
+let flipStarted = d.states["input_boolean.side2_flip_to_flower"].state;
+let switchState = d.states["switch.600_rspec"].state;
+let lightsOnTime = d.states["input_datetime.side_2_lights_on_time"].state;
+let debugMode = true;
 
 // Function to log debug messages with labels
 function logDebug(label, value) {
@@ -36,24 +40,20 @@ function parseTimeToSeconds(timeStr) {
 // Function to calculate the lights control logic
 function calculateLightsControl() {
     var currentTime = new Date().getTime() / 1000; // Get current time in seconds
-    var flipStarted = msg.flipState;
-    var switchState = msg.switchState; // Get the current state of the switch
-    var lightsOnTimeInSeconds = parseTimeToSeconds(msg.lightOn);
-    var lightsOffTimeInSeconds;
+    // Parse time to seconds
+    let lightsOnTimeInSeconds = parseTimeToSeconds(lightsOnTime);
 
     // Calculate lightsOffTimeInSeconds based on flipStarted
-    if (flipStarted == 'on') {
-        // Flip switch is on, so lights are off for 12 hours
+    let lightsOffTimeInSeconds;
+    if (flipStarted) {
         lightsOffTimeInSeconds = lightsOnTimeInSeconds + 12 * 3600;
     } else {
-        // Flip switch is off, so lights are off for 18 hours
         lightsOffTimeInSeconds = lightsOnTimeInSeconds + 18 * 3600;
     }
 
-    // Debugging: Log the values of lightsOnTimeInSeconds, lightsOffTimeInSeconds, currentTime, and flipStarted
+    // Debugging: Log the values of lightsOnTimeInSeconds, lightsOffTimeInSeconds, and flipStarted
     logDebug('lightsOnTimeInSeconds:', lightsOnTimeInSeconds);
     logDebug('lightsOffTimeInSeconds:', lightsOffTimeInSeconds);
-    logDebug('currentTime:', currentTime);
     logDebug('flipStarted:', flipStarted);
 
     if (lightsOnTimeInSeconds < lightsOffTimeInSeconds) {
@@ -123,4 +123,3 @@ function calculateLightsControl() {
 
 // Call the calculateLightsControl function to perform the lights control logic
 calculateLightsControl();
-
