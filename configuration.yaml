@@ -4,51 +4,71 @@ input_text:
     initial: ""
     max: 255
 template:
-  sensors:
-    flower_table_vpd:
-      friendly_name: "Flower Canopy VPD"
-      icon_template: mdi:waves-arrow-up
-      value_template: >-
-        {% set T = states('sensor.flower_table_env_sensor_temperature')|float %}
-        {% set RH = states('sensor.flower_table_env_sensor_humidity')|float %}
-        {% set T_C = (T - 32) * 5 / 9 %} 
-        {% set SVP = 0.61078 * e ** (T_C / (T_C + 237.3) * 17.2694) %}
-        {% set VPD = SVP * ((100 - RH) / 100) %} {{-VPD | round(2) -}}
+  - sensor:
+    - name: "Side 2 Table VPD"
+      unique_id: side2_table_vpd
       unit_of_measurement: "kPa"
-    required_rh_kpa_vpd_flower_table:
-      friendly_name: "Required Rh For Desired kPa"
-      value_template: >-
-        {% set T_F = states('sensor.flower_table_env_sensor_temperature')|float %}
-        {% set T_C = (T_F - 32) * (5 / 9) %}
-        {% set desired_kpa = states('input_number.desired_kpa')|float %}
+      state: >
+        {% set T_F = states('sensor.grow_side2_table_temp')|float %}
+        {% set RH = states('sensor.grow_side2_table_humidity_rh')|float %}
+        {% set T_C = (T_F - 32) * 5 / 9 %} 
+        {% set x = (17.27 * T_C) / (T_C + 237.3) %}
+        {% set exp_x = 1 + x + (x ** 2)/2 + (x ** 3)/6 + (x ** 4)/24 %}
+        {% set SVP = 0.6108 * exp_x %}
+        {% set VPD = SVP * ((100 - RH) / 100) %}
+        {{- VPD | round(2) }}
+    - name: "Required Rh For Desired kPa Side 2"
+      unique_id: side2_rh_required
+      unit_of_measurement: "%"
+      state: >
+        {% set T_F = states('sensor.grow_side2_table_temp')|float %}
+        {% set T_C = (T_F - 32) * 5 / 9 %}
+        {% set desired_kpa = states('input_number.side2_desired_kpa')|float %}
         {% set x = (17.27 * T_C) / (T_C + 237.3) %}
         {% set exp_x = 1 + x + (x ** 2)/2 + (x ** 3)/6 + (x ** 4)/24 %}
         {% set SVP = 0.6108 * exp_x %}
         {% set RH = ((SVP - desired_kpa) / SVP) * 100 %}
-        {{-RH| round (0)}}
-      unit_of_measurement: "%"
-    tent_vpd:
-      friendly_name: "Tent VPD"
-      icon_template: mdi:waves-arrow-up
-      value_template: >-
-        {% set T = states('sensor.garden_tent_rh_and_temp_garden_tent_temperature')|float %}
-        {% set RH = states('sensor.garden_tent_rh_and_temp_garden_tent_humidity')|float %}
-        {% set T_C = (T - 32) * 5 / 9 %} 
-        {% set SVP = 0.61078 * e ** (T_C / (T_C + 237.3) * 17.2694) %}
-        {% set VPD = SVP * ((100 - RH) / 100) %} {{-VPD | round(2) -}}
+        {{- RH | round(0) }}
+    - name: "Side 1 Table VPD"
+      unique_id: side1_table_vpd
       unit_of_measurement: "kPa"
-    required_rh_kpa_vpd_tent:
-      friendly_name: "Required Rh For Desired kPa in Tent"
-      value_template: >-
-        {% set T_F = states('sensor.garden_tent_rh_and_temp_garden_tent_temperature')|float %}
-        {% set T_C = (T_F - 32) * (5 / 9) %}
-        {% set desired_kpa = states('input_number.desired_kpa_garden_tent')|float %}
+      state: >
+        {% set T_F = states('sensor.grow_side1_table_temp')|float %}
+        {% set RH = states('sensor.grow_side1_table_humidity_rh')|float %}
+        {% set T_C = (T_F - 32) * 5 / 9 %} 
+        {% set x = (17.27 * T_C) / (T_C + 237.3) %}
+        {% set exp_x = 1 + x + (x ** 2)/2 + (x ** 3)/6 + (x ** 4)/24 %}
+        {% set SVP = 0.6108 * exp_x %}
+        {% set VPD = SVP * ((100 - RH) / 100) %}
+        {{- VPD | round(2) }}
+    - name: "Required Rh For Desired kPa Side 1"
+      unique_id: side1_rh_required
+      unit_of_measurement: "%"
+      state: >
+        {% set T_F = states('sensor.grow_side1_table_temp')|float %}
+        {% set T_C = (T_F - 32) * 5 / 9 %}
+        {% set desired_kpa = states('input_number.side1_desired_kpa')|float %}
         {% set x = (17.27 * T_C) / (T_C + 237.3) %}
         {% set exp_x = 1 + x + (x ** 2)/2 + (x ** 3)/6 + (x ** 4)/24 %}
         {% set SVP = 0.6108 * exp_x %}
         {% set RH = ((SVP - desired_kpa) / SVP) * 100 %}
-        {{-RH| round (0)}}
-      unit_of_measurement: "%"
+        {{- RH | round(0) }}
+
 input_boolean:
-  has_flip_to_flower_started:
-    name: "Has the flower flip started"
+  side2_flip_to_flower:
+    name: "Flip Side 2"
+  side1_filp_to_flower:
+    name: "Flip Side 1 "
+input_number:
+  side2_desired_kpa:
+    name: "Side 2 Kpa Desired"
+    initial: 1.0
+    min: .5
+    max: 1.5
+    step: .01
+  side1_desired_kpa:
+    name: "Side 1 Kpa Desired"
+    initial: 1.0
+    min: .5
+    max: 1.5
+    step: .01
