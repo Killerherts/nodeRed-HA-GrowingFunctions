@@ -1,0 +1,43 @@
+[
+    {
+        "id": "80743cf86c1af36b",
+        "type": "api-call-service",
+        "z": "f24803d10ac9bfd3",
+        "name": "",
+        "server": "aff48610.614bb8",
+        "version": 5,
+        "debugenabled": true,
+        "domain": "{{payload.service_domain}}",
+        "service": "{{payload.service}}",
+        "areaId": [],
+        "deviceId": [],
+        "entityId": [
+            "{{payload.entity_id}}"
+        ],
+        "data": "",
+        "dataType": "jsonata",
+        "mergeContext": "",
+        "mustacheAltTags": false,
+        "outputProperties": [],
+        "queue": "none",
+        "x": 660,
+        "y": 700,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "aff48610.614bb8",
+        "type": "server",
+        "name": "HomeAssistant",
+        "addon": true,
+        "rejectUnauthorizedCerts": true,
+        "ha_boolean": "",
+        "connectionDelay": false,
+        "cacheJson": false,
+        "heartbeat": false,
+        "heartbeatInterval": "",
+        "statusSeparator": "",
+        "enableGlobalContextStore": true
+    }
+]
