@@ -1,0 +1,21 @@
+    - name: "Soil Sensor a1 pwEC"
+      unique_id: "Soil Sensor a1 pwEC"
+      unit_of_measurement: "ms/cm"
+      state: >-
+        {%- set soil_ec_raw = states('sensor.soil_sesor_a1_conductivity_1_dsm_1_mscm') | float * 100 %}
+        {%- set soil_temp = states('sensor.soil_sesor_a1_temp') | float %}
+        {%- set soil_hum = states('sensor.soil_sesor_a1_moisture_wc') | float %}
+        {%- if soil_ec_raw == none or soil_temp == none or soil_hum == none %}
+            {{ 'unavailable' }}
+        {%- else %}
+            {%- set soil_ec_adjusted = 1.93 * soil_ec_raw - 270.8 %}
+            {%- set temperature_correction = 1.0 + 0.019 * (soil_temp - 25) %}
+            {%- set soil_ec = soil_ec_adjusted / temperature_correction %}
+            {%- set apparent_dielectric_constant = 1.3088 + 0.1439 * soil_hum + 0.0076 * soil_hum ** 2 %}
+            {%- set pore_permittivity = 80.3 - 0.37 * (soil_temp - 20) %}
+            {%- set pw_ec = 0 %}
+            {%- if apparent_dielectric_constant > 4.1 %}
+            {%- set pw_ec = (pore_permittivity * soil_ec) / (apparent_dielectric_constant - 4.1) / 1000 %}
+            {%- endif %}
+            {{ pw_ec | round(1) }}
+        {%- endif %}
