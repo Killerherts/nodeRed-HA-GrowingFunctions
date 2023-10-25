@@ -1,1 +1,78 @@
-[{"id":"fb7f815e12f54cb0","type":"api-call-service","z":"f24803d10ac9bfd3","name":"","server":"aff48610.614bb8","version":5,"debugenabled":true,"domain":"{{payload.service_domain}}","service":"{{payload.service}}","areaId":[],"deviceId":[],"entityId":["{{payload.entity_id}}"],"data":"","dataType":"jsonata","mergeContext":"","mustacheAltTags":false,"outputProperties":[],"queue":"none","x":740,"y":120,"wires":[[]]},{"id":"aff48610.614bb8","type":"server","name":"HomeAssistant","addon":true,"rejectUnauthorizedCerts":true,"ha_boolean":"","connectionDelay":false,"cacheJson":false,"heartbeat":false,"heartbeatInterval":"","statusSeparator":"","enableGlobalContextStore":false}]
+[
+  {
+    "id": "37b0051a43b92ca0",
+    "type": "inject",
+    "z": "1f9ff542be636aa9",
+    "name": "",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "60",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 230,
+    "y": 400,
+    "wires": [
+      [
+        "de78abd16fcaf98d"
+      ]
+    ]
+  },
+  {
+    "id": "de78abd16fcaf98d",
+    "type": "function",
+    "z": "1f9ff542be636aa9",
+    "name": "Turn Lights On/Off",
+    "func": "const HA_CONFIG = {\n    homeAssistantObject: 'homeassistant.homeAssistant',\n    flipStartedEntity: 'input_boolean.side1_filp_to_flower',\n    switchStateEntity: 'switch.side_1_grow_light',\n    lightsOnTimeEntity: 'input_datetime.side_1_lights_on_time',\n    lightControlEntity: 'switch.side_1_grow_light',\n    serviceDomain: 'switch'\n};\n\n// Fetch the Home Assistant object and states\nconst d = global.get(HA_CONFIG.homeAssistantObject);\nlet flipStarted = d.states[HA_CONFIG.flipStartedEntity].state;\nlet switchState = d.states[HA_CONFIG.switchStateEntity].state;\nlet lightsOnTime = d.states[HA_CONFIG.lightsOnTimeEntity].state;\nlet debugMode = false;\n\n// Function to log debug messages with labels\nfunction logDebug(label, value) {\n    if (debugMode) {\n        node.warn(label + ' ' + value);\n    }\n}\n\n// Function to toggle debug mode on/off\nfunction toggleDebugMode() {\n    debugMode = !debugMode;\n    if (debugMode) {\n        node.warn('Debug mode is ON');\n    } else {\n        node.warn('Debug mode is OFF');\n    }\n}\n\n// Function to parse time in HH:mm:ss format to seconds\nfunction parseTimeToSeconds(timeStr) {\n    var parts = timeStr.split(':');\n    if (parts.length === 3) {\n        var hours = parseInt(parts[0]);\n        var minutes = parseInt(parts[1]);\n        var seconds = parseInt(parts[2]);\n        return hours * 3600 + minutes * 60 + seconds;\n    } else {\n        // Handle invalid time format if needed\n        node.error('Invalid time format in msg.lightOn');\n        return 0; // Return 0 as a fallback\n    }\n}\n\n// Function to calculate the lights control logic\nfunction calculateLightsControl() {\n    // Get the current date and time\n    const currentDate = new Date();\n\n    // Extract hours, minutes, and seconds\n    const currentHours = currentDate.getHours();\n    const currentMinutes = currentDate.getMinutes();\n    const currentSeconds = currentDate.getSeconds();\n\n// Calculate the total seconds\n    const currentTime = (currentHours * 3600) + (currentMinutes * 60) + currentSeconds;\n\n\n    // Parse time to seconds\n    let lightsOnTimeInSeconds = parseTimeToSeconds(lightsOnTime);\n\n    // Calculate lightsOffTimeInSeconds based on flipStarted\n    let lightsOffTimeInSeconds;\n    if (flipStarted) {\n        lightsOffTimeInSeconds = lightsOnTimeInSeconds + (12 * 3600);\n    } else {\n        lightsOffTimeInSeconds = lightsOnTimeInSeconds + (18 * 3600);\n    }\n\n    // Ensure lightsOffTimeInSeconds doesn't exceed 24 hours\n    lightsOffTimeInSeconds = lightsOffTimeInSeconds % (24 * 3600);\n\n    // Debugging: Log the values of lightsOnTimeInSeconds, lightsOffTimeInSeconds, and flipStarted\n    logDebug('lightsOnTimeInSeconds:', lightsOnTimeInSeconds);\n    logDebug('lightsOffTimeInSeconds:', lightsOffTimeInSeconds);\n    logDebug('flipStarted:', flipStarted);\n    logDebug('current time ', currentTime);\n    logDebug('Switch State: ', switchState);\n\n    if (lightsOnTimeInSeconds < lightsOffTimeInSeconds) {\n        // Lights come on and go off on the same day\n        if (currentTime >= lightsOnTimeInSeconds && currentTime < lightsOffTimeInSeconds) {\n            // Within the time range and switch is off, turn on the lights\n            if (switchState == 'off') {\n                msg.payload = {\n                    service_domain: HA_CONFIG.serviceDomain,\n                    service: 'turn_on',\n                    entity_id: HA_CONFIG.lightControlEntity\n                };\n                // Debugging: Log that the lights are being turned on\n                logDebug('Turning on the lights', '');\n                node.send(msg);\n                return msg;\n            }\n        } else {\n            // Outside the time range or switch is already on, turn off the lights\n            if (switchState == 'on') {\n                msg.payload = {\n                    service_domain: HA_CONFIG.serviceDomain,\n                    service: 'turn_off',\n                    entity_id: HA_CONFIG.lightControlEntity\n                };\n                // Debugging: Log that the lights are being turned off\n                logDebug('Turning off the lights', '');\n                node.send(msg);\n                return msg;\n            }\n        }\n    } else {\n        // Lights come on before midnight and go off after midnight\n        if (currentTime >= lightsOnTimeInSeconds || currentTime < lightsOffTimeInSeconds) {\n            // Within the time range and switch is off, turn on the lights\n            if (switchState == 'off') {\n                \n                msg.payload = {\n                    service_domain: HA_CONFIG.serviceDomain,\n                    service: 'turn_on',\n                    entity_id: HA_CONFIG.lightControlEntity\n                };\n                // Debugging: Log that the lights are being turned on\n                logDebug('Turning on the lights', '');\n                node.send(msg);\n                return msg;\n            }\n        } else {\n            // Outside the time range or switch is already on, turn off the lights\n            if (switchState == 'on') {\n                msg.payload = {\n                    service_domain: HA_CONFIG.serviceDomain,\n                    service: 'turn_off',\n                    entity_id: HA_CONFIG.lightControlEntity\n                };\n                // Debugging: Log that the lights are being turned off\n                logDebug('Turning off the lights', '');\n                node.send(msg);\n                return msg;\n            }\n        }\n    }\n}\n\n    // No action needed, switch is already in the desired position\n    // Debugging: Log that no action is needed\nlogDebug('No action needed');\n\n\n// Call the calculateLightsControl function to perform the lights control logic\ncalculateLightsControl();",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 400,
+    "wires": [
+      [
+        "8bae16071e2c879d"
+      ]
+    ]
+  },
+  {
+    "id": "8bae16071e2c879d",
+    "type": "api-call-service",
+    "z": "1f9ff542be636aa9",
+    "name": "Call Service Payload Var",
+    "server": "",
+    "version": 5,
+    "debugenabled": true,
+    "domain": "{{payload.service_domain}}",
+    "service": "{{payload.service}}",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": [
+      "{{payload.entity_id}}"
+    ],
+    "data": "",
+    "dataType": "jsonata",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [],
+    "queue": "none",
+    "x": 690,
+    "y": 400,
+    "wires": [
+      []
+    ]
+  }
+]
