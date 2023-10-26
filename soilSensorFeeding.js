@@ -1,12 +1,12 @@
 // Constants for Home Assistant Entity IDs
 const ENTITY_IDS = {
-    highestSoilSensor: 'input_number.highest_soil_sensor_value_side_1',
-    generative: 'input_boolean.side1_generative_steering',
-    flipToFlower: 'input_boolean.side1_filp_to_flower',
-    lightOnTime: 'input_datetime.side_1_lights_on_time',
+    highestSoilSensor: 'input_number.highest_soil_sensor_value',
+    generative: 'input_boolean.side_2_generative_steering',
+    flipToFlower: 'input_boolean.side2_flip_to_flower',
+    lightOnTime: 'input_datetime.side_2_lights_on_time',
     soilMoisture: 'sensor.soil_sesor_a1_moisture_wc',
-    maintenancePhase: 'input_boolean.side1_maintance_phase',
-    feedPumpSwitch: 'switch.side_1_feed_pump_switch'
+    maintenancePhase: 'input_boolean.side_2_maintance_phase',
+    feedPumpSwitch: 'switch.side_2_feed_pump_switch'
 };
 
 // Other Constants
@@ -22,11 +22,11 @@ const debug = true;
 
 
 // For retrieving data:
-let highestSoilsensorVal = 42.00; //getHAState(ENTITY_IDS.highestSoilSensor);
+let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
 let generative = getHAState(ENTITY_IDS.generative) === 'on';
 let flipToFlower = getHAState(ENTITY_IDS.flipToFlower) === 'on';
 let lightOnTime = convertTime(getHAState(ENTITY_IDS.lightOnTime));
-let soilMoisture = 42.00; //parseFloat(getHAState(ENTITY_IDS.soilMoisture));
+let soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));
 let maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase) === 'on';
 debugWarn('maintenacePhase: ' + maintenancePhase)
 let currentTime = getCurrentTime();
@@ -214,8 +214,7 @@ function processControlFlow() {
         if (!maintenancePhase) {
             if (moistureDifference <= P1_THRESHOLD || highestSoilsensorVal >= DESIRED_MOISTURE) {
                 debugWarn('P2 Flip Switch');
-                turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
-                delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
+                flipBooleanOutput = buildPayload('turn_on', 'input_boolean', ENTITY_IDS.maintenancePhase);
             } else if (moistureDifference > P1_THRESHOLD) {
                 debugWarn('P1 feed');
                 turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
