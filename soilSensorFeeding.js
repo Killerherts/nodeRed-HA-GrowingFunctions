@@ -11,28 +11,26 @@ const ENTITY_IDS = {
 
 // Other Constants
 const SECONDS_IN_DAY = 24 * 60 * 60;
-const MIN_IRRIGATION_FREQUENCY = 1 * 60; // 10 minutes in seconds
+const MIN_IRRIGATION_FREQUENCY = 6 * 60; // 10 minutes in seconds
 const DESIRED_MOISTURE = 46; // Desired moisture level in water content percentage
 const P1_THRESHOLD = 2;
 const P2_THRESHOLD = 5; //dryback % before sending a p2
-const MAX_DELTA = 18; //max dryback overnight
+const MAX_DELTA = 25; //max dryback overnight
 const DELAY_FOR_P1_FEED = 25;  // in seconds
-const DELAY_FOR_P2_FEED = 35;  // in seconds
+const DELAY_FOR_P2_FEED = 45;  // in seconds
 const debug = true;
 
 
 // For retrieving data:
 let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
-let generative = getHAState(ENTITY_IDS.generative) === 'on';
-let flipToFlower = getHAState(ENTITY_IDS.flipToFlower) === 'on';
-let lightOnTime = convertTime(getHAState(ENTITY_IDS.lightOnTime));
+let generative = getHAState(ENTITY_IDS.generative);
+let flipToFlower = getHAState(ENTITY_IDS.flipToFlower);
+let lightOnTime = convertTimeToSecondsUTC(getHAState(ENTITY_IDS.lightOnTime));
 let soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));
-let maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase) === 'on';
-debugWarn('maintenacePhase: ' + maintenancePhase)
+let maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase);
 let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
 let timeSinceLastIrrigation;
-
 // Calculate parameters
 let lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
@@ -45,6 +43,25 @@ if (lastChanged < currentTimeUTC) {
     timeSinceLastIrrigation = Math.floor(currentTimeUTC - lastChanged);
 } else {
     timeSinceLastIrrigation = Math.floor((SECONDS_IN_DAY - lastChanged) + currentTimeUTC);
+}
+
+function utcMsToLocalHHMMSS(utcMs) {
+    var date = new Date(utcMs);
+    return date.toLocaleTimeString('en-US', { hour12: false });
+}
+
+function toHHMMSS(timeSeconds) {
+    const sec = parseInt(timeSeconds, 10); // convert value to number if it's string
+    let hours = Math.floor(sec / 3600); // get hours
+    let minutes = Math.floor((sec - (hours * 3600)) / 60); // get minutes
+    let seconds = sec - (hours * 3600) - (minutes * 60); // get seconds
+
+    // add 0 if value < 10; Example: 2 -> 02
+    if (hours < 10) { hours = "0" + hours; }
+    if (minutes < 10) { minutes = "0" + minutes; }
+    if (seconds < 10) { seconds = "0" + seconds; }
+
+    return hours + ':' + minutes + ':' + seconds; // Return is HH : MM : SS
 }
 
 
@@ -62,34 +79,32 @@ function convert_epoch_to_utc_seconds(epoch_ms) {
     return seconds_into_day_utc;
 }
 
+function convertTimeToSecondsUTC(timeString) {
+    // Split the time string by ':' to get hours, minutes, and seconds
+    const parts = timeString.split(':');
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const seconds = parseInt(parts[2], 10);
 
-// Function to convert time2 string
-function convertTime(timeString) {
-    let time;
-    let isUtc = false;
+    // Calculate the total number of seconds from midnight
+    return hours * 3600 + minutes * 60 + seconds;
+}
 
-    if (!timeString) {
-        time = new Date();
-    } else {
-        time = new Date(timeString);
-        isUtc = timeString.includes("Z") || timeString.includes("+") || timeString.includes("-");
-        if (isNaN(time.getTime())) {
-            time = new Date("1970-01-01T" + timeString + "Z");
-            isUtc = true;
-        }
-    }
+function convertUTCToLocalTime(utcMilliseconds) {
+    // Create a new Date object from the UTC milliseconds
+    const date = new Date(utcMilliseconds);
 
-    let hours, minutes, seconds;
-    if (isUtc) {
-        hours = time.getUTCHours();
-        minutes = time.getUTCMinutes();
-        seconds = time.getUTCSeconds();
-    } else {
-        hours = time.getHours();
-        minutes = time.getMinutes();
-        seconds = time.getSeconds();
-    }
-    return parseInt(hours * 60 * 60) + parseInt(minutes * 60) + parseInt(seconds);
+    // Options for toLocaleTimeString to output time in HH:MM:SS format
+    const options = {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false // Use 24-hour format
+    };
+
+    // Convert to local time string with specified options
+    // @ts-ignore
+    return date.toLocaleTimeString( 'en-US', options);
 }
 
 // Function to retrieve state from Home Assistant
@@ -145,14 +160,12 @@ function calculateLightOffTime(flipToFlower, lightOnTime) {
 // Function to calculate irrigation start time dynamically based on lights on time
 function calculateIrrigationStart(generative, lightOnTime) {
     let irrigationStart = lightOnTime;
-
-    if (generative) {
-        irrigationStart += 2 * 60 * 60; // Add 2 hours for generative steering
+    if (generative == "on") {
+        irrigationStart = irrigationStart + (2 * 60 * 60); // Add 2 hours for generative steering
     } else {
         // Use a default start time if generative is not enabled
-        irrigationStart += 60 * 60; // Add 1 hour
+        irrigationStart = irrigationStart + (60 * 60); // Add 1 hour
     }
-
     return irrigationStart;
 }
 
@@ -161,30 +174,34 @@ function calculateIrrigationEnd(lightOffTime) {
     return (lightOffTime - 60 * 60) % SECONDS_IN_DAY;
 }
 
-// Function to check if current time is in irrigation window
 function checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {
-    if (irrigationStart > irrigationEnd) {
-        return currentTime >= irrigationStart || currentTime <= irrigationEnd;
+    if (irrigationStart < irrigationEnd) {
+        // The irrigation window does not span midnight
+        return currentTime >= irrigationStart && currentTime < irrigationEnd;
     } else {
-        return currentTime >= irrigationStart && currentTime <= irrigationEnd;
+        // The irrigation window spans midnight
+        // currentTime must be either after irrigationStart on the same day or before irrigationEnd on the next day
+        return currentTime >= irrigationStart || currentTime < irrigationEnd;
     }
 }
 
-// Process control flow
+// Enhanced logging for debugging
 function logDebugData() {
     if (debug) {
-        node.warn("inIrrigationWindow: " + inIrrigationWindow);
+        debugWarn("Is in irrigation window? " + inIrrigationWindow);
         node.warn("Generative: " + generative);
         node.warn("Flip to flower: " + flipToFlower);
         node.warn("Soil moisture: " + soilMoisture);
-        node.warn("Current time: " + currentTime);
-        node.warn("Irrigation start time: " + irrigationStart);
-        node.warn("Irrigation end time: " + irrigationEnd);
-        node.warn("last Irrigation Run " + lastChanged);
+        node.warn("last Irrigation Run " + utcMsToLocalHHMMSS(lastChangedTimeMs));
         node.warn("Highest Sensor Value: " + highestSoilsensorVal);
-        node.warn("Last changed Switch:" + lastChangedTimeMs + " ms " + lastChanged)
+        // Additional logging to help with debugging
+        node.warn("timeSinceLastIrrigation: " + toHHMMSS(timeSinceLastIrrigation));
+        node.warn("Current Time: " + new Date(currentTime * 1000).toISOString().substr(11, 8));
+        node.warn("Irrigation Start: " + new Date(irrigationStart * 1000).toISOString().substr(11, 8));
+        node.warn("Irrigation End: " + new Date(irrigationEnd * 1000).toISOString().substr(11, 8));
     }
 }
+
 
 // Modify all your node.warn calls to check the debug flag
 function debugWarn(message) {
