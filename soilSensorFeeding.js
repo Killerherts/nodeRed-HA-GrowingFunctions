@@ -190,6 +190,7 @@ function logDebugData() {
     if (debug) {
         debugWarn("Is in irrigation window? " + inIrrigationWindow);
         node.warn("Generative: " + generative);
+        debugWarn('Maintance Phase: '+ maintenancePhase)
         node.warn("Flip to flower: " + flipToFlower);
         node.warn("Soil moisture: " + soilMoisture);
         node.warn("last Irrigation Run " + utcMsToLocalHHMMSS(lastChangedTimeMs));
@@ -220,7 +221,11 @@ function processControlFlow() {
         debugWarn(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
         return [null, null, null, null];
     }
-
+    //reset highest soil value sensor at beginging of lights on
+    if (currentTimeUTC == lightOnTime) {
+        setInputNumberOutput = buildPayload('set_value', 'input_number', ENTITY_IDS.highestSoilSensor, null, { value: 0 });  // Reset highestSoilSensor value to 0
+        return setInputNumberOutput
+    }
     const moistureDifference = DESIRED_MOISTURE - soilMoisture;
 
     if (Math.abs(moistureDifference) > MAX_DELTA) {
@@ -242,18 +247,12 @@ function processControlFlow() {
             turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
             delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
         }
-    } else {
-        if ((irrigationStart < irrigationEnd && (currentTime > irrigationEnd || currentTime < irrigationStart)) ||
-            (irrigationStart > irrigationEnd && !(currentTime > irrigationStart && currentTime < irrigationEnd))) {
-            if (maintenancePhase == true) {
-                debugWarn("Resetting Maintenance Switch");
-                setInputNumberOutput = buildPayload('set_value', 'input_number', ENTITY_IDS.highestSoilSensor, null, {value:0});  // Reset highestSoilSensor value to 0
-                flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
-            }
-        }
     }
-
-     return [turnOnOutput, delayAndTurnOffOutput, flipBooleanOutput, setInputNumberOutput];
+    if (!inIrrigationWindow && maintenancePhase != 'off') {
+                debugWarn("Resetting Maintenance Switch");
+                flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
+    }
+    return [turnOnOutput, delayAndTurnOffOutput, flipBooleanOutput, setInputNumberOutput];
 }
 
 logDebugData()
