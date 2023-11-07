@@ -1,3 +1,7 @@
+/**One thhing of note I use a traditional automation to update my
+ * highest soil sensor. I find this is easy just to do through the gui
+ */
+
 // Constants for Home Assistant Entity IDs
 const ENTITY_IDS = {
     highestSoilSensor: 'input_number.highest_soil_sensor_value',
@@ -9,8 +13,6 @@ const ENTITY_IDS = {
     feedPumpSwitch: 'switch.side_2_feed_pump_switch'
 };
 
-// Other Constants
-const SECONDS_IN_DAY = 24 * 60 * 60;
 const MIN_IRRIGATION_FREQUENCY = 6 * 60; // 10 minutes in seconds
 const DESIRED_MOISTURE = 46; // Desired moisture level in water content percentage
 const P1_THRESHOLD = 2;
@@ -19,7 +21,13 @@ const MAX_DELTA = 25; //max dryback overnight
 const DELAY_FOR_P1_FEED = 25;  // in seconds
 const DELAY_FOR_P2_FEED = 45;  // in seconds
 const debug = true;
-
+/**
+ * 
+ * Nothing needs to be changed under this section unless your modifing 
+ * the basic functionality or how the script works. 
+ * Modifiy at your own risk
+ * 
+ */
 
 // For retrieving data:
 let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
@@ -30,14 +38,18 @@ let soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));
 let maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase);
 let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
-let timeSinceLastIrrigation;
+
+
 // Calculate parameters
+const SECONDS_IN_DAY = 24 * 60 * 60; 
 let lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
 let irrigationEnd = calculateIrrigationEnd(lightOffTime);
 let lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.states[ENTITY_IDS.feedPumpSwitch].last_changed).getTime();
 let lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);
 let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
+let timeSinceLastIrrigation;
+
 
 if (lastChanged < currentTimeUTC) {
     timeSinceLastIrrigation = Math.floor(currentTimeUTC - lastChanged);
@@ -221,8 +233,9 @@ function processControlFlow() {
         debugWarn(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
         return [null, null, null, null];
     }
+
     //reset highest soil value sensor at beginging of lights on
-    if (currentTimeUTC == lightOnTime) {
+    if (Math.abs(currentTimeUTC - lightOnTime) < 60) {
         setInputNumberOutput = buildPayload('set_value', 'input_number', ENTITY_IDS.highestSoilSensor, null, { value: 0 });  // Reset highestSoilSensor value to 0
         return setInputNumberOutput
     }
