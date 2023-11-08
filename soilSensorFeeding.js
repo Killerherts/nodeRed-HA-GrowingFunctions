@@ -246,8 +246,8 @@ function processControlFlow() {
         turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
         delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
     } else if (inIrrigationWindow) {
-        if (!maintenancePhase) {
-            if (moistureDifference <= P1_THRESHOLD || highestSoilsensorVal >= DESIRED_MOISTURE) {
+        if (maintenancePhase == 'off') {
+            if (highestSoilsensorVal >= DESIRED_MOISTURE) {
                 debugWarn('P2 Flip Switch');
                 flipBooleanOutput = buildPayload('turn_on', 'input_boolean', ENTITY_IDS.maintenancePhase);
             } else if (moistureDifference > P1_THRESHOLD) {
