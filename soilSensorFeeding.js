@@ -20,7 +20,7 @@ const P2_THRESHOLD = 5; //dryback % before sending a p2
 const MAX_DELTA = 25; //max dryback overnight
 const DELAY_FOR_P1_FEED = 25;  // in seconds
 const DELAY_FOR_P2_FEED = 45;  // in seconds
-const debug = false;
+const debug = true;
 /**
  * 
  * Nothing needs to be changed under this section unless your modifing 
@@ -38,7 +38,6 @@ let soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));
 let maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase);
 let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
-
 
 // Calculate parameters
 const SECONDS_IN_DAY = 24 * 60 * 60; 
@@ -172,10 +171,19 @@ function getCurrentTime() {
     return now.getSeconds() + (60 * (now.getMinutes() + 60 * now.getHours()));
 }
 
-
-// Function to calculate light off time
 function calculateLightOffTime(flipToFlower, lightOnTime) {
-    return flipToFlower ? lightOnTime + 12 * 60 * 60 : lightOnTime + 18 * 60 * 60;
+    let lightDuration = flipToFlower === 'on' ? 12 * 60 * 60 : 18 * 60 * 60;
+    let lightOffTime = (lightOnTime + lightDuration) - SECONDS_IN_DAY;
+
+    return lightOffTime;
+}
+
+function calculateIrrigationEnd(lightOffTime) {
+    if (generative == 'on') {
+        return lightOffTime - 2 * 60 * 60;
+    } else {
+        return lightOffTime - 60 * 60;
+    }
 }
 
 // Function to calculate irrigation start time dynamically based on lights on time
@@ -190,12 +198,14 @@ function calculateIrrigationStart(generative, lightOnTime) {
     return irrigationStart;
 }
 
-// Function to calculate irrigation end time dynamically based on light off time
-function calculateIrrigationEnd(lightOffTime) {
-    return (lightOffTime - 60 * 60) % SECONDS_IN_DAY;
-}
+
 
 function checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {
+    // Normalize times to a 24-hour cycle to handle cases where times span across midnight
+    currentTime = currentTime % SECONDS_IN_DAY;
+    irrigationStart = irrigationStart % SECONDS_IN_DAY;
+    irrigationEnd = irrigationEnd % SECONDS_IN_DAY;
+
     if (irrigationStart < irrigationEnd) {
         // The irrigation window does not span midnight
         return currentTime >= irrigationStart && currentTime < irrigationEnd;
