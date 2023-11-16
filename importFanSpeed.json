@@ -1,300 +1,65 @@
-[
-  {
-    "id": "474ab73a69514d66",
-    "type": "inject",
-    "z": "1f61e07f53956bdf",
-    "name": "",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "300",
-    "crontab": "",
-    "once": true,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "",
-    "payloadType": "date",
-    "x": 130,
-    "y": 200,
-    "wires": [
-      [
-        "7f126de5e326f770"
-      ]
-    ]
-  },
-  {
-    "id": "7f126de5e326f770",
-    "type": "api-current-state",
-    "z": "1f61e07f53956bdf",
-    "name": "Brightness",
-    "server": "",
-    "version": 3,
-    "outputs": 1,
-    "halt_if": "",
-    "halt_if_type": "str",
-    "halt_if_compare": "is",
-    "entity_id": "light.inline_fan_controller_dimmer",
-    "state_type": "str",
-    "blockInputOverrides": false,
-    "outputProperties": [
-      {
-        "property": "payload",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entityState"
-      },
-      {
-        "property": "data",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entity"
-      },
-      {
-        "property": "brightness",
-        "propertyType": "msg",
-        "value": "data.attributes.brightness",
-        "valueType": "jsonata"
-      }
-    ],
-    "for": "0",
-    "forType": "num",
-    "forUnits": "minutes",
-    "override_topic": false,
-    "state_location": "payload",
-    "override_payload": "msg",
-    "entity_location": "data",
-    "override_data": "msg",
-    "x": 290,
-    "y": 200,
-    "wires": [
-      [
-        "e38e3d413ca473cd"
-      ]
-    ]
-  },
-  {
-    "id": "e38e3d413ca473cd",
-    "type": "api-current-state",
-    "z": "1f61e07f53956bdf",
-    "name": "Get current Rh",
-    "server": "",
-    "version": 3,
-    "outputs": 1,
-    "halt_if": "",
-    "halt_if_type": "str",
-    "halt_if_compare": "is",
-    "entity_id": "sensor.side_1_table_rh_and_temp_humidity",
-    "state_type": "num",
-    "blockInputOverrides": false,
-    "outputProperties": [
-      {
-        "property": "rh",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entityState"
-      },
-      {
-        "property": "data",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entity"
-      },
-      {
-        "property": "temp",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entityState"
-      }
-    ],
-    "for": 0,
-    "forType": "num",
-    "forUnits": "minutes",
-    "x": 480,
-    "y": 200,
-    "wires": [
-      [
-        "fdb815399a1e7da2"
-      ]
-    ]
-  },
-  {
-    "id": "fdb815399a1e7da2",
-    "type": "api-current-state",
-    "z": "1f61e07f53956bdf",
-    "name": "get req rh",
-    "server": "",
-    "version": 3,
-    "outputs": 1,
-    "halt_if": "",
-    "halt_if_type": "str",
-    "halt_if_compare": "is",
-    "entity_id": "sensor.required_rh_kpa_vpd_side1",
-    "state_type": "num",
-    "blockInputOverrides": false,
-    "outputProperties": [
-      {
-        "property": "req_rh",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entityState"
-      },
-      {
-        "property": "data",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entity"
-      }
-    ],
-    "for": "0",
-    "forType": "num",
-    "forUnits": "minutes",
-    "override_topic": false,
-    "state_location": "payload",
-    "override_payload": "msg",
-    "entity_location": "data",
-    "override_data": "msg",
-    "x": 620,
-    "y": 260,
-    "wires": [
-      [
-        "3d88322a6d31859f"
-      ]
-    ]
-  },
-  {
-    "id": "3d88322a6d31859f",
-    "type": "api-current-state",
-    "z": "1f61e07f53956bdf",
-    "name": "Side 1 Get temp",
-    "server": "",
-    "version": 3,
-    "outputs": 1,
-    "halt_if": "",
-    "halt_if_type": "str",
-    "halt_if_compare": "is",
-    "entity_id": "sensor.side_1_table_rh_and_temp_temperature",
-    "state_type": "num",
-    "blockInputOverrides": false,
-    "outputProperties": [
-      {
-        "property": "payload",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entityState"
-      },
-      {
-        "property": "data",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entity"
-      },
-      {
-        "property": "temp",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entityState"
-      }
-    ],
-    "for": 0,
-    "forType": "num",
-    "forUnits": "minutes",
-    "x": 780,
-    "y": 260,
-    "wires": [
-      [
-        "b25e959903f0b980"
-      ]
-    ]
-  },
-  {
-    "id": "b25e959903f0b980",
-    "type": "api-current-state",
-    "z": "1f61e07f53956bdf",
-    "name": "desired temperature",
-    "server": "",
-    "version": 3,
-    "outputs": 1,
-    "halt_if": "",
-    "halt_if_type": "str",
-    "halt_if_compare": "is",
-    "entity_id": "input_number.desired_side1_temp",
-    "state_type": "num",
-    "blockInputOverrides": false,
-    "outputProperties": [
-      {
-        "property": "desiredTemperature",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entityState"
-      },
-      {
-        "property": "data",
-        "propertyType": "msg",
-        "value": "",
-        "valueType": "entity"
-      }
-    ],
-    "for": 0,
-    "forType": "num",
-    "forUnits": "minutes",
-    "x": 980,
-    "y": 260,
-    "wires": [
-      [
-        "9ded306469c47ea5"
-      ]
-    ]
-  },
-  {
-    "id": "9ded306469c47ea5",
-    "type": "function",
-    "z": "1f61e07f53956bdf",
-    "name": "Set Fan Speed Based on temp and current speed",
-    "func": "const currentRh = msg.rh;\nconst requiredRh = msg.req_rh;\nconst currentTemp = msg.temp;\nconst desiredTemp = msg.desiredTemperature;\nconst currentBrightness = msg.brightness;\n\n//node.warn(\"current brightness: \" + currentBrightness + \", current rh: \" + currentRh + ', current temp: ' + currentTemp);\n\nconst maxBrightness = 255;\nconst minBrightness = 1;\nconst brightnessScaling = 8;\n\nlet brightnessAdjustment = brightnessScaling;\n\nif (currentTemp > desiredTemp || currentRh > requiredRh) {\n    // Either temperature or humidity is above desired level\n    msg.brightness = Math.min(currentBrightness + brightnessAdjustment, maxBrightness);\n    node.warn(\"Either temperature or humidity is above desired level. Increasing brightness by brightness scaling. New Level is \" + Math.round((msg.brightness / maxBrightness) * 100));\n    msg.payload = msg.brightness;\n    return msg;\n} else if (currentTemp < desiredTemp && currentRh < requiredRh && currentBrightness != (Math.max(currentBrightness - (brightnessAdjustment * 2), minBrightness))) {\n    // Both temperature and humidity are below desired levels\n    msg.brightness = Math.max(currentBrightness - (brightnessAdjustment * 2), minBrightness);\n    node.warn(\"Both temperature and humidity are below desired levels. Decreasing brightness by brightness scaling. New Brightness is \" + Math.round((msg.brightness / maxBrightness) * 100));\n    msg.payload = msg.brightness;\n    return msg;\n} else {\n    // No action required\n    node.warn(\"No action required. Keeping the brightness unchanged.\");\n}\n",
-    "outputs": 1,
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 1290,
-    "y": 260,
-    "wires": [
-      [
-        "31dc3b1c9655b0d3"
-      ]
-    ]
-  },
-  {
-    "id": "31dc3b1c9655b0d3",
-    "type": "api-call-service",
-    "z": "1f61e07f53956bdf",
-    "name": "",
-    "server": "",
-    "version": 5,
-    "debugenabled": true,
-    "domain": "light",
-    "service": "turn_on",
-    "areaId": [],
-    "deviceId": [],
-    "entityId": [
-      "light.inline_fan_controller_dimmer"
-    ],
-    "data": "{\"brightness\": brightness}",
-    "dataType": "jsonata",
-    "mergeContext": "",
-    "mustacheAltTags": false,
-    "outputProperties": [],
-    "queue": "none",
-    "x": 1610,
-    "y": 260,
-    "wires": [
-      []
-    ]
-  }
-]
+[{
+	"id": "ec403ab5ffe12e9f",
+	"type": "inject",
+	"z": "1f9ff542be636aa9",
+	"name": "",
+	"props": [{
+		"p": "payload"
+	}, {
+		"p": "topic",
+		"vt": "str"
+	}],
+	"repeat": "360",
+	"crontab": "",
+	"once": false,
+	"onceDelay": 0.1,
+	"topic": "",
+	"payload": "",
+	"payloadType": "date",
+	"x": 150,
+	"y": 680,
+	"wires": [
+		["f2abd8602246cfed"]
+	]
+}, {
+	"id": "f2abd8602246cfed",
+	"type": "function",
+	"z": "1f9ff542be636aa9",
+	"name": "Room Fan Exhuast",
+	"func": "//set=up any const we need\nconst ENTITY_IDS = {\n    fanSensor: 'light.grow_side_1_exhuast',\n    desiredTemp: 'input_number.side1_max_temp',\n    roomTemp: 'sensor.grow_side1_table_temp',\n    roomRH: 'sensor.grow_side1_table_humidity_rh',\n    desiredRh: 'sensor.required_rh_for_desired_kpa_side_1'\n};\n\n\nlet fanState = getHAState(ENTITY_IDS.fanSensor, 'state');\nlet desiredTemp = getHAState(ENTITY_IDS.desiredTemp, 'state');\nlet roomTemp = getHAState(ENTITY_IDS.roomTemp, 'state');\nlet roomRH = getHAState(ENTITY_IDS.roomRH, 'state');\nlet desiredRh = getHAState(ENTITY_IDS.desiredRh, 'state');\n// Variables for easy adjustment\nlet debug = true;\nconst SPEED_RANGE = 255; // Maximum fan speed\nconst MAX_TEMP_DIFFERENCE = 10; // Maximum considered temperature difference\n\n//Check all the variables\nif (fanState != 'null') {\n    let fanSpeed = getHAState(ENTITY_IDS.fanSensor, 'brightness');\n    debugWarn(\"fanSpeed: \" + fanSpeed);\n}\ndebugWarn(\"fanState: \" + fanState);\ndebugWarn(\"desiredTemp: \" + desiredTemp);\ndebugWarn(\"roomTemp: \" + roomTemp);\ndebugWarn(\"roomRH: \" + roomRH);\ndebugWarn(\"desiredRh: \" + desiredRh);\n\n\n/**\n * Retrieves a specific property or attribute from a Home Assistant state object.\n * \n * @param {string} entityId - The ID of the entity.\n * @param {string} [property='state'] - The property or attribute to retrieve (default is 'state').\n * @return The value of the specified property or attribute, or null if not found.\n */\nfunction getHAState(entityId, property = 'state') {\n    const homeAssistant = global.get('homeassistant');\n    if (homeAssistant && homeAssistant.homeAssistant.states && homeAssistant.homeAssistant.states[entityId]) {\n        const stateObj = homeAssistant.homeAssistant.states[entityId];\n        if (property === 'state') {\n            return stateObj.state;\n        } else if (stateObj.attributes && stateObj.attributes.hasOwnProperty(property)) {\n            // Check if the property is an attribute\n            return stateObj.attributes[property];\n        } else {\n            node.warn(`Property or attribute '${property}' not found in state object: ${entityId}`);\n            return null;\n        }\n    } else {\n        node.warn(`State not found or global object is undefined: ${entityId}`);\n        return null;\n    }\n}\n\n// Modify all your node.warn calls to check the debug flag\nfunction debugWarn(message) {\n    if (debug) {\n        node.warn(message);\n    }\n}\n//build the payload for call service\nfunction buildPayload(service, domain, entity_id, delay = null, data = {}) {\n    let payload = {\n        service: service,\n        domain: domain,\n        entity_id: entity_id,\n        data: data\n    };\n\n    let message = {\n        payload: payload\n    };\n\n    if (delay !== null) {\n        message.delay = delay * 1000; // Convert seconds to milliseconds\n    }\n\n    return message;\n}\n\nfunction adjustFanSpeed() {\n    // Ensure all required states are available\n    if (roomTemp === null || desiredTemp === null || fanState === null) {\n        debugWarn(\"Required state is missing.\");\n        return null; // Return null to indicate no action needed\n    }\n\n    // Convert string states to numbers for comparison\n    let currentTemp = parseFloat(roomTemp);\n    let targetTemp = parseFloat(desiredTemp);\n\n    // If current temperature is at or below target and fan is on, turn off the fan\n    if (currentTemp <= targetTemp && fanState == 'on') {\n        debugWarn(\"Current temperature is at or below target. Turning off the fan.\");\n        return buildPayload('turn_off', 'light', ENTITY_IDS.fanSensor);\n    }\n\n    // If fan is off and temperature is above target, turn it on\n    if (fanState === 'off' && currentTemp > targetTemp) {\n        debugWarn(\"Fan is off and temperature is above target. Turning it on.\");\n        let initialSpeed = calculateInitialFanSpeed(currentTemp, targetTemp);\n        return setFanSpeed(initialSpeed);\n    }\n\n    // If fan is already off and temperature is at or below target, do nothing\n    if (fanState === 'off' && currentTemp <= targetTemp) {\n        debugWarn(\"Fan is off and temperature is at or below target. No action needed.\");\n        return null;\n    }\n\n    // Calculate the difference between current and desired temperature\n    let tempDifference = currentTemp - targetTemp;\n\n    // Map the temperature difference to fan speed\n    let speed = Math.min(Math.round((tempDifference / MAX_TEMP_DIFFERENCE) * SPEED_RANGE), SPEED_RANGE);\n\n    // Set the fan speed\n    return setFanSpeed(speed);\n}\n\nfunction calculateInitialFanSpeed(currentTemp, targetTemp) {\n    // Implement your logic to calculate the initial fan speed\n    // For example, you might want to start with a moderate speed\n    // and then adjust based on the temperature difference\n    let tempDifference = Math.max(currentTemp - targetTemp, 0);\n    return Math.min(Math.round((tempDifference / MAX_TEMP_DIFFERENCE) * SPEED_RANGE), SPEED_RANGE);\n}\n\n/**\n * Prepares the fan speed setting payload.\n * @param {number} speed - Fan speed value (0 to 255).\n * @return The message payload for the next node.\n */\nfunction setFanSpeed(speed) {\n    // Assuming the speed is set by adjusting the brightness of the fan light entity\n    let data = { brightness: speed };\n    let payload = buildPayload('turn_on', 'light', ENTITY_IDS.fanSensor, null, data);\n\n    // Return the payload for the next node in the flow\n    return payload;\n}\n\n// Call the adjustFanSpeed function and pass the result to the next node\nreturn adjustFanSpeed();",
+	"outputs": 1,
+	"timeout": 0,
+	"noerr": 0,
+	"initialize": "",
+	"finalize": "",
+	"libs": [],
+	"x": 330,
+	"y": 680,
+	"wires": [
+		["650a9ceea54df8da"]
+	]
+}, {
+	"id": "650a9ceea54df8da",
+	"type": "api-call-service",
+	"z": "1f9ff542be636aa9",
+	"name": "Call Service Payload Var",
+	"server": "",
+	"version": 5,
+	"debugenabled": true,
+	"domain": "{{payload.service_domain}}",
+	"service": "{{payload.service}}",
+	"areaId": [],
+	"deviceId": [],
+	"entityId": ["{{payload.entity_id}}"],
+	"data": "",
+	"dataType": "jsonata",
+	"mergeContext": "",
+	"mustacheAltTags": false,
+	"outputProperties": [],
+	"queue": "none",
+	"x": 630,
+	"y": 680,
+	"wires": [
+		[]
+	]
+}]
