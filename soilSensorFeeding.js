@@ -4,13 +4,13 @@
 
 // Constants for Home Assistant Entity IDs
 const ENTITY_IDS = {
-    highestSoilSensor: 'input_number.highest_soil_sensor_value',
-    generative: 'input_boolean.side_2_generative_steering',
-    flipToFlower: 'input_boolean.side2_flip_to_flower',
-    lightOnTime: 'input_datetime.side_2_lights_on_time',
-    soilMoisture: 'sensor.soil_sesor_a1_moisture_wc',
-    maintenancePhase: 'input_boolean.side_2_maintance_phase',
-    feedPumpSwitch: 'switch.side_2_feed_pump_switch'
+    highestSoilSensor: 'input_number.highest_soil_sensor_value_side_1',
+    generative: 'input_boolean.side1_generative_steering',
+    flipToFlower: 'input_boolean.side1_filp_to_flower',
+    lightOnTime: 'input_datetime.side_1_lights_on_time',
+    soilMoisture: 'sensor.soil_sensor_a2_moisture_wc',
+    maintenancePhase: 'input_boolean.side1_maintance_phase',
+    feedPumpSwitch: 'switch.side_1_feed_pump_switch'
 };
 
 const MIN_IRRIGATION_FREQUENCY = 6 * 60; // 10 minutes in seconds
@@ -20,7 +20,7 @@ const P2_THRESHOLD = 5; //dryback % before sending a p2
 const MAX_DELTA = 25; //max dryback overnight
 const DELAY_FOR_P1_FEED = 25;  // in seconds
 const DELAY_FOR_P2_FEED = 45;  // in seconds
-const debug = true;
+const debug = false;
 /**
  * 
  * Nothing needs to be changed under this section unless your modifing 
@@ -49,7 +49,6 @@ let lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.state
 let lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);
 let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
 let timeSinceLastIrrigation;
-
 
 if (lastChanged < currentTimeUTC) {
     timeSinceLastIrrigation = Math.floor(currentTimeUTC - lastChanged);
@@ -121,8 +120,18 @@ function convertUTCToLocalTime(utcMilliseconds) {
 
 // Function to retrieve state from Home Assistant
 function getHAState(state) {
-    return global.get('homeassistant').homeAssistant.states[state].state;
+    // Check if the states object and the specific state exist
+    if (global.get('homeassistant') && global.get('homeassistant').homeAssistant
+        && global.get('homeassistant').homeAssistant.states
+        && global.get('homeassistant').homeAssistant.states[state]) {
+        return global.get('homeassistant').homeAssistant.states[state].state;
+    } else {
+        // Handle the case where the state or any parent object is undefined
+        node.warn("State not found or global object is undefined: " + state);
+        return null; // or you can throw an error or return a default value
+    }
 }
+
 
 /**
  * Constructs a payload for Home Assistant service calls.
