@@ -1,6 +1,6 @@
 const HA_CONFIG = {
     homeAssistantObject: 'homeassistant.homeAssistant',
-    flipStartedEntity: 'input_boolean.side1_filp_to_flower',
+    darkHoursEntity: 'input_number.side_1_dark_hours',
     switchStateEntity: 'switch.side_1_grow_light',
     lightsOnTimeEntity: 'input_datetime.side_1_lights_on_time',
     lightControlEntity: 'switch.side_1_grow_light',
@@ -9,7 +9,7 @@ const HA_CONFIG = {
 
 // Fetch the Home Assistant object and states
 const d = global.get(HA_CONFIG.homeAssistantObject);
-let flipStarted = d.states[HA_CONFIG.flipStartedEntity].state;
+let darkHours = parseFloat(d.states[HA_CONFIG.darkHoursEntity].state);
 let switchState = d.states[HA_CONFIG.switchStateEntity].state;
 let lightsOnTime = d.states[HA_CONFIG.lightsOnTimeEntity].state;
 let debugMode = false;
@@ -48,105 +48,68 @@ function parseTimeToSeconds(timeStr) {
 
 // Function to calculate the lights control logic
 function calculateLightsControl() {
-    // Get the current date and time
     const currentDate = new Date();
-
-    // Extract hours, minutes, and seconds
     const currentHours = currentDate.getHours();
     const currentMinutes = currentDate.getMinutes();
     const currentSeconds = currentDate.getSeconds();
-
-// Calculate the total seconds
     const currentTime = (currentHours * 3600) + (currentMinutes * 60) + currentSeconds;
-
-
-    // Parse time to seconds
     let lightsOnTimeInSeconds = parseTimeToSeconds(lightsOnTime);
+    let lightsOffTimeInSeconds = lightsOnTimeInSeconds + ((24 - darkHours) * 3600);
 
-    // Calculate lightsOffTimeInSeconds based on flipStarted
-    let lightsOffTimeInSeconds;
-    if (flipStarted) {
-        lightsOffTimeInSeconds = lightsOnTimeInSeconds + (12 * 3600);
-    } else {
-        lightsOffTimeInSeconds = lightsOnTimeInSeconds + (18 * 3600);
+    if (lightsOffTimeInSeconds >= 86400) {
+        lightsOffTimeInSeconds -= 86400;
     }
-
-    // Ensure lightsOffTimeInSeconds doesn't exceed 24 hours
-    lightsOffTimeInSeconds = lightsOffTimeInSeconds % (24 * 3600);
-
-    // Debugging: Log the values of lightsOnTimeInSeconds, lightsOffTimeInSeconds, and flipStarted
+    
     logDebug('lightsOnTimeInSeconds:', lightsOnTimeInSeconds);
     logDebug('lightsOffTimeInSeconds:', lightsOffTimeInSeconds);
-    logDebug('flipStarted:', flipStarted);
+    logDebug('darkHours:', darkHours);
     logDebug('current time ', currentTime);
     logDebug('Switch State: ', switchState);
 
     if (lightsOnTimeInSeconds < lightsOffTimeInSeconds) {
-        // Lights come on and go off on the same day
         if (currentTime >= lightsOnTimeInSeconds && currentTime < lightsOffTimeInSeconds) {
-            // Within the time range and switch is off, turn on the lights
             if (switchState == 'off') {
-                msg.payload = {
-                    service_domain: HA_CONFIG.serviceDomain,
-                    service: 'turn_on',
-                    entity_id: HA_CONFIG.lightControlEntity
-                };
-                // Debugging: Log that the lights are being turned on
-                logDebug('Turning on the lights', '');
-                node.send(msg);
-                return msg;
+                return turnOnLights();
             }
         } else {
-            // Outside the time range or switch is already on, turn off the lights
             if (switchState == 'on') {
-                msg.payload = {
-                    service_domain: HA_CONFIG.serviceDomain,
-                    service: 'turn_off',
-                    entity_id: HA_CONFIG.lightControlEntity
-                };
-                // Debugging: Log that the lights are being turned off
-                logDebug('Turning off the lights', '');
-                node.send(msg);
-                return msg;
+                return turnOffLights();
             }
         }
     } else {
-        // Lights come on before midnight and go off after midnight
         if (currentTime >= lightsOnTimeInSeconds || currentTime < lightsOffTimeInSeconds) {
-            // Within the time range and switch is off, turn on the lights
             if (switchState == 'off') {
-                
-                msg.payload = {
-                    service_domain: HA_CONFIG.serviceDomain,
-                    service: 'turn_on',
-                    entity_id: HA_CONFIG.lightControlEntity
-                };
-                // Debugging: Log that the lights are being turned on
-                logDebug('Turning on the lights', '');
-                node.send(msg);
-                return msg;
+                return turnOnLights();
             }
         } else {
-            // Outside the time range or switch is already on, turn off the lights
             if (switchState == 'on') {
-                msg.payload = {
-                    service_domain: HA_CONFIG.serviceDomain,
-                    service: 'turn_off',
-                    entity_id: HA_CONFIG.lightControlEntity
-                };
-                // Debugging: Log that the lights are being turned off
-                logDebug('Turning off the lights', '');
-                node.send(msg);
-                return msg;
+                return turnOffLights();
             }
         }
     }
+    
+    logDebug('No action needed', '');
 }
 
-    // No action needed, switch is already in the desired position
-    // Debugging: Log that no action is needed
-logDebug('No action needed');
+function turnOnLights() {
+    msg.payload = {
+        service_domain: HA_CONFIG.serviceDomain,
+        service: 'turn_on',
+        entity_id: HA_CONFIG.lightControlEntity
+    };
+    logDebug('Turning on the lights', '');
+    return node.send(msg);
+}
 
+function turnOffLights() {
+    msg.payload = {
+        service_domain: HA_CONFIG.serviceDomain,
+        service: 'turn_off',
+        entity_id: HA_CONFIG.lightControlEntity
+    };
+    logDebug('Turning off the lights', '');
+    return node.send(msg);
+}
 
 // Call the calculateLightsControl function to perform the lights control logic
 calculateLightsControl();
