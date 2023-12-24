@@ -1,10 +1,63 @@
-input_text:
-  feed_and_on_times:
-    name: Feed and On Times
-    initial: ""
-    max: 255
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml  
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+yeelight:
+  custom_effects:
+    - name: 'Xmax'
+      flow_params:
+        count: 0
+        transitions:
+            - RGBTransition: [255, 0, 0, 2500, 100]
+            - RGBTransition: [0, 255, 0, 2500, 100]
+            - RGBTransition: [0, 0, 255, 2500, 100]
+    - name: 'Flicker2'
+      flow_params:
+        count: 0
+        transitions:
+          - TemperatureTransition: [6500, 50, 0]
+          - TemperatureTransition: [6500, 50, 50]
+          - SleepTransition:       [3000]
+          - TemperatureTransition: [6500, 50, 0]
+          - TemperatureTransition: [6500, 50, 50]
+          - TemperatureTransition: [6500, 50, 0]
+          - TemperatureTransition: [6500, 50, 50]
+          - TemperatureTransition: [6500, 500, 0]
+          - TemperatureTransition: [6500, 50, 80]
 template:
   - sensor:
+    - name: "People Are Home"
+      unique_id: people_home
+      state: >
+          {{ 'true' if is_state('device_tracker.nathan_s_pixel_7', 'home') or is_state('device_tracker.mikaela_s_pixel_7', 'home') else 'false' }}
+    - name: "Tent VPD"
+      unique_id: tent_vpd
+      unit_of_measurement: "kPa"
+      state: >
+        {% set T_F = states('sensor.tent_temp_sensor_living_room_temperature')|float %}
+        {% set RH = states('sensor.tent_temp_sensor_living_room_humidity')|float %}
+        {% set T_C = (T_F - 32) * 5 / 9 %} 
+        {% set x = (17.27 * T_C) / (T_C + 237.3) %}
+        {% set exp_x = 1 + x + (x ** 2)/2 + (x ** 3)/6 + (x ** 4)/24 %}
+        {% set SVP = 0.6108 * exp_x %}
+        {% set VPD = SVP * ((100 - RH) / 100) %}
+        {{- VPD | round(2) }}
+    - name: "Required Rh For Desired kPa Side 2"
+      unique_id: Tent_rh_required
+      unit_of_measurement: "%"
+      state: >
+        {% set T_F = states('sensor.tent_temp_sensor_living_room_temperature')|float %}
+        {% set T_C = (T_F - 32) * 5 / 9 %}
+        {% set desired_kpa = states('input_number.tent_desired_kpa')|float %}
+        {% set x = (17.27 * T_C) / (T_C + 237.3) %}
+        {% set exp_x = 1 + x + (x ** 2)/2 + (x ** 3)/6 + (x ** 4)/24 %}
+        {% set SVP = 0.6108 * exp_x %}
+        {% set RH = ((SVP - desired_kpa) / SVP) * 100 %}
+        {{- RH | round(0) }}
     - name: "Side 2 Table VPD"
       unique_id: side2_table_vpd
       unit_of_measurement: "kPa"
@@ -33,8 +86,8 @@ template:
       unique_id: side1_table_vpd
       unit_of_measurement: "kPa"
       state: >
-        {% set T_F = states('sensor.grow_side1_table_temp')|float %}
-        {% set RH = states('sensor.grow_side1_table_humidity_rh')|float %}
+        {% set T_F = states('sensor.grow_side1_table_temperature')|float %}
+        {% set RH = states('sensor.grow_side1_table_humidity')|float %}
         {% set T_C = (T_F - 32) * 5 / 9 %} 
         {% set x = (17.27 * T_C) / (T_C + 237.3) %}
         {% set exp_x = 1 + x + (x ** 2)/2 + (x ** 3)/6 + (x ** 4)/24 %}
@@ -45,7 +98,7 @@ template:
       unique_id: side1_rh_required
       unit_of_measurement: "%"
       state: >
-        {% set T_F = states('sensor.grow_side1_table_temp')|float %}
+        {% set T_F = states('sensor.grow_side1_table_temperature')|float %}
         {% set T_C = (T_F - 32) * 5 / 9 %}
         {% set desired_kpa = states('input_number.side1_desired_kpa')|float %}
         {% set x = (17.27 * T_C) / (T_C + 237.3) %}
@@ -53,22 +106,137 @@ template:
         {% set SVP = 0.6108 * exp_x %}
         {% set RH = ((SVP - desired_kpa) / SVP) * 100 %}
         {{- RH | round(0) }}
-
+    - name: "Soil Sensor a1 pwEC"
+      unique_id: "Soil Sensor a1 pwEC"
+      unit_of_measurement: "ms/cm"
+      state: >-
+        {%- set soil_ec_raw = states('sensor.soil_sesor_a1_conductivity_1_dsm_1_mscm') | float * 100 %}
+        {%- set soil_temp = states('sensor.soil_sesor_a1_temp') | float %}
+        {%- set soil_hum = states('sensor.soil_sesor_a1_moisture_wc') | float %}
+        {%- if soil_ec_raw == none or soil_temp == none or soil_hum == none %}
+            {{ 'unavailable' }}
+        {%- else %}
+            {%- set soil_ec_adjusted = 1.93 * soil_ec_raw - 270.8 %}
+            {%- set temperature_correction = 1.0 + 0.019 * (soil_temp - 25) %}
+            {%- set soil_ec = soil_ec_adjusted / temperature_correction %}
+            {%- set apparent_dielectric_constant = 1.3088 + 0.1439 * soil_hum + 0.0076 * soil_hum ** 2 %}
+            {%- set pore_permittivity = 80.3 - 0.37 * (soil_temp - 20) %}
+            {%- set pw_ec = 0 %}
+            {%- if apparent_dielectric_constant > 4.1 %}
+            {%- set pw_ec = (pore_permittivity * soil_ec) / (apparent_dielectric_constant - 4.1) / 1000 %}
+            {%- endif %}
+            {{ pw_ec | round(1) }}
+        {%- endif %}
+    - name: "Soil Sensor a2 pwEC"
+      unique_id: "Soil Sensor a2 pwEC"
+      unit_of_measurement: "ms/cm"
+      state: >-
+         {% set soil_ec = states('sensor.soil_sensor_a2_conductivity_1_ds_m_1_ms_cm') | float * 100 %}
+          {% set soil_ec = 1.93 * soil_ec - 270.8 %}
+          {% set soil_temp = states('sensor.soil_sensor_a2_temp') | float %}
+          {% set soil_hum = states('sensor.vwc_a2_soil_sensor') | float %}
+          {% set soil_ec = soil_ec / (1.0 + 0.019 * (soil_temp -25 )) %}
+          {% set soil_apparent_dieletric_constant = 1.3088 + 0.1439 * soil_hum + 0.0076 * soil_hum * soil_hum | float %}
+          {% set soil_bulk_permittivity = soil_apparent_dieletric_constant | float %}
+          {% set soil_pore_permittivity = 80.3 - 0.37 * (soil_temp - 20) | float %}
+          {% if soil_bulk_permittivity > 4.1 %}
+            {% set pw_ec = (soil_pore_permittivity * soil_ec) / (soil_bulk_permittivity - 4.1) / 1000 | float %}
+          {% else %}
+            {% set pw_ec = 0 %}
+          {% endif %}
+          {{ pw_ec | round(1) }}
+    - name: "VWC A2 Soil Sensor"
+      unique_id: "A2 Soil Sensor"
+      unit_of_measurement: "%"
+      state: >-
+        {% set soil_hum = states('sensor.soil_sensor_a2_moisture_wc') | float %}
+        {% set soil_hum = -0.0020844495456097786 * soil_hum * soil_hum + 0.8758395803818368 * soil_hum -0.007765958483453483 %}
+        {{  soil_hum | round(1) }} 
 input_boolean:
+  do_we_have_guests:
+    name: "Do We Have Guests"
+  side1_flip_to_flower:
+    name: "Side 1 Flip Started"
   side2_flip_to_flower:
-    name: "Flip Side 2"
-  side1_filp_to_flower:
-    name: "Flip Side 1 "
+    name: "Side 2 Flip Started"
+  side1_generative_steering:
+    name: "Side 1 Generative Steering"
+  side1_maintance_phase:
+    name: "Side 1 Maintaince Phase"
 input_number:
-  side2_desired_kpa:
-    name: "Side 2 Kpa Desired"
+  tent_desired_kpa:
+    name: "Tent Kpa Desired"
     initial: 1.0
     min: .5
     max: 1.5
     step: .01
+    mode: box
+  tent_dark_hours:
+    name: "Tent Dark Hours"
+    initial: 4
+    min: 0
+    max: 24
+    step: .5
+    mode: box
+  side_1_dark_hours:
+    name: "Side 1 Dark Hours"
+    initial: 4
+    min: 0
+    max: 24
+    step: .5
+    mode: box
+  side_2_dark_hours:
+    name: "Side 2 Dark Hours"
+    initial: 4
+    min: 0
+    max: 24
+    step: .5
+    mode: box
+  side2_desired_kpa:
+    name: "Side 2 Kpa Desired"
+    initial: 1.2
+    min: .5
+    max: 1.5
+    step: .01
+    mode: box
   side1_desired_kpa:
     name: "Side 1 Kpa Desired"
     initial: 1.0
     min: .5
     max: 1.5
     step: .01
+    mode: box
+  highest_soil_sensor_value:
+    name: "Highest Soil Sensor Value"
+    min: 0
+    max: 100
+    step: .1
+    mode: box
+  highest_soil_sensor_value_side_1:
+    name: "Highest Soil Sensor Value Side 1"
+    min: 0
+    max: 100
+    step: .1
+    mode: box
+  highest_soil_sensor_value_side_2:
+    name: "Highest Soil Sensor Value Side 2"
+    min: 0
+    max: 100
+    step: .1
+    mode: box
+  side1_max_temp:
+    name: "Side 1 Max Temp"
+    initial: 78
+    min: 65
+    max: 85
+    step: 1.0
+    mode: box
+input_datetime:
+  side1_lights_on_time:
+    name: Side 1 Lights On Time
+    has_date: false
+    has_time: true
+  tent_lights_on_time:
+    name: Tent Lights On Time
+    has_date: false
+    has_time: true
