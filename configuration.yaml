@@ -33,7 +33,7 @@ template:
     - name: "People Are Home"
       unique_id: people_home
       state: >
-          {{ 'true' if is_state('device_tracker.nathan_s_pixel_7', 'home') or is_state('device_tracker.mikaela_s_pixel_7', 'home') else 'false' }}
+          {{ 'true' if is_state('device_tracker.%%%%', 'home') or is_state('device_tracker.$$$', 'home') else 'false' }}
     - name: "Tent VPD"
       unique_id: tent_vpd
       unit_of_measurement: "kPa"
