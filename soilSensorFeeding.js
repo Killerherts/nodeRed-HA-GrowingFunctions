@@ -4,13 +4,13 @@
 
 // Constants for Home Assistant Entity IDs
 const ENTITY_IDS = {
-    highestSoilSensor: 'input_number.highest_soil_sensor_value_side_1',
-    generative: 'input_boolean.side1_generative_steering',
-    flipToFlower: 'input_boolean.side1_filp_to_flower',
-    lightOnTime: 'input_datetime.side_1_lights_on_time',
-    soilMoisture: 'sensor.soil_sensor_a2_moisture_wc',
-    maintenancePhase: 'input_boolean.side1_maintance_phase',
-    feedPumpSwitch: 'switch.side_1_feed_pump_switch'
+    highestSoilSensor: 'input_number.highest_soil_sensor_value',
+    generative: 'input_boolean.side_2_generative_steering',
+    darkHours: 'input_number.tent_dark_hours',
+    lightOnTime: 'input_datetime.side_2_lights_on_time',
+    soilMoisture: 'sensor.soil_sesor_a1_moisture_wc',
+    maintenancePhase: 'input_boolean.side_2_maintance_phase',
+    feedPumpSwitch: 'switch.side_2_feed_pump_switch'
 };
 
 const MIN_IRRIGATION_FREQUENCY = 6 * 60; // 10 minutes in seconds
@@ -32,16 +32,16 @@ const debug = true;
 // For retrieving data:
 let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
 let generative = getHAState(ENTITY_IDS.generative);
-let flipToFlower = getHAState(ENTITY_IDS.flipToFlower);
 let lightOnTime = convertTimeToSecondsUTC(getHAState(ENTITY_IDS.lightOnTime));
 let soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));
 let maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase);
 let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
+let darkHours = parseFloat(getHAState(ENTITY_IDS.darkHours));
 
 // Calculate parameters
 const SECONDS_IN_DAY = 24 * 60 * 60; 
-let lightOffTime = calculateLightOffTime(flipToFlower, lightOnTime);
+let lightOffTime = calculateLightOffTime(darkHours, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
 let irrigationEnd = calculateIrrigationEnd(lightOffTime);
 let lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.states[ENTITY_IDS.feedPumpSwitch].last_changed).getTime();
@@ -171,12 +171,13 @@ function getCurrentTime() {
     return now.getSeconds() + (60 * (now.getMinutes() + 60 * now.getHours()));
 }
 
-function calculateLightOffTime(flipToFlower, lightOnTime) {
-    let lightDuration = flipToFlower === 'on' ? 12 * 60 * 60 : 18 * 60 * 60;
-    let lightOffTime = (lightOnTime + lightDuration) - SECONDS_IN_DAY;
+function calculateLightOffTime(darkHours, lightOnTime) {
+    let lightDuration = (24 - darkHours) * 60 * 60; // Calculate light duration based on dark hours
+    let lightOffTime = (lightOnTime + lightDuration) % SECONDS_IN_DAY; // Adjust for midnight crossover
 
     return lightOffTime;
 }
+
 
 function calculateIrrigationEnd(lightOffTime) {
     if (generative == 'on') {
@@ -222,7 +223,7 @@ function logDebugData() {
         debugWarn("Is in irrigation window? " + inIrrigationWindow);
         node.warn("Generative: " + generative);
         debugWarn('Maintance Phase: '+ maintenancePhase)
-        node.warn("Flip to flower: " + flipToFlower);
+        node.warn("Dark hours: " + darkHours);
         node.warn("Soil moisture: " + soilMoisture);
         node.warn("last Irrigation Run " + utcMsToLocalHHMMSS(lastChangedTimeMs));
         node.warn("Highest Sensor Value: " + highestSoilsensorVal);
@@ -260,7 +261,7 @@ function processControlFlow() {
     }
     const moistureDifference = DESIRED_MOISTURE - soilMoisture;
 
-    if (Math.abs(moistureDifference) > MAX_DELTA) {
+    if (moistureDifference > MAX_DELTA) {
         debugWarn("Max Dryback Feeding");
         turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
         delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
