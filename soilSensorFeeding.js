@@ -22,11 +22,11 @@ const DELAY_FOR_P1_FEED = 19;  // in seconds
 const DELAY_FOR_P2_FEED = 45;  // in seconds
 const debug = false;
 /**
- * 
- * Nothing needs to be changed under this section unless your modifing 
- * the basic functionality or how the script works. 
+ *
+ * Nothing needs to be changed under this section unless your modifing
+ * the basic functionality or how the script works.
  * Modifiy at your own risk
- * 
+ *
  */
 
 // For retrieving data:
@@ -40,7 +40,7 @@ let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
 
 // Calculate parameters
-const SECONDS_IN_DAY = 24 * 60 * 60; 
+const SECONDS_IN_DAY = 24 * 60 * 60;
 let lightOffTime = calculateLightOffTime(darkHours, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
 let irrigationEnd = calculateIrrigationEnd(lightOffTime);
@@ -134,7 +134,7 @@ function getHAState(state) {
 
 /**
  * Constructs a payload for Home Assistant service calls.
- * 
+ *
  * @param {string} service - The service to be called (e.g., 'turn_on', 'turn_off').
  * @param {string} domain - The domain of the entity (e.g., 'switch', 'light').
  * @param {string} entity_id - The id of the entity to be acted upon.
@@ -239,21 +239,21 @@ function logDebugData() {
 //function to make logbook entries
 function debugWarn(message) {
     // Create a message object with the payload for the api-call-service node
+    let entry =node.warn(ENTITY_IDS.feedPumpSwitch)
     const logMessage = {
         payload: {
             service_domain: 'logbook',
             service: 'log',
+            entity_id: ENTITY_IDS.feedPumpSwitch,
             data: {
                 name: "Irrigation System",
                 message: message,
-                //entity_id: "logs"
             }
         }
     };
-
     // Send the message to the api-call-service node
     // Assuming 'node.send()' is available in your function context to send the message
-    node.send([null, null, null, null, logMessage]);
+    node.send(logMessage);
 }
 
 function processControlFlow() {
