@@ -4,23 +4,23 @@
 
 // Constants for Home Assistant Entity IDs
 const ENTITY_IDS = {
-    highestSoilSensor: 'input_number.highest_soil_sensor_value',
-    generative: 'input_boolean.side_2_generative_steering',
-    darkHours: 'input_number.tent_dark_hours',
-    lightOnTime: 'input_datetime.side_2_lights_on_time',
-    soilMoisture: 'sensor.soil_sesor_a1_moisture_wc',
-    maintenancePhase: 'input_boolean.side_2_maintance_phase',
-    feedPumpSwitch: 'switch.side_2_feed_pump_switch'
+    highestSoilSensor: 'input_number.highest_soil_sensor_value_side_1',
+    generative: 'input_boolean.side1_generative_steering',
+    darkHours: 'input_number.side_1_dark_hours',
+    lightOnTime: 'input_datetime.side_1_lights_on_time',
+    soilMoisture: 'sensor.vwc_a2_soil_sensor',
+    maintenancePhase: 'input_boolean.side1_maintance_phase',
+    feedPumpSwitch: 'switch.side_1_feed_pump_switch'
 };
 
-const MIN_IRRIGATION_FREQUENCY = 6 * 60; // 10 minutes in seconds
-const DESIRED_MOISTURE = 46; // Desired moisture level in water content percentage
+const MIN_IRRIGATION_FREQUENCY = 10 * 60; // 10 minutes in seconds
+const DESIRED_MOISTURE = 45; // Desired moisture level in water content percentage
 const P1_THRESHOLD = 2;
-const P2_THRESHOLD = 5; //dryback % before sending a p2
+const P2_THRESHOLD = 7; //dryback % before sending a p2
 const MAX_DELTA = 25; //max dryback overnight
-const DELAY_FOR_P1_FEED = 25;  // in seconds
+const DELAY_FOR_P1_FEED = 19;  // in seconds
 const DELAY_FOR_P2_FEED = 45;  // in seconds
-const debug = true;
+const debug = false;
 /**
  * 
  * Nothing needs to be changed under this section unless your modifing 
@@ -32,12 +32,12 @@ const debug = true;
 // For retrieving data:
 let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
 let generative = getHAState(ENTITY_IDS.generative);
+let darkHours = parseFloat(getHAState(ENTITY_IDS.darkHours));
 let lightOnTime = convertTimeToSecondsUTC(getHAState(ENTITY_IDS.lightOnTime));
 let soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));
 let maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase);
 let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
-let darkHours = parseFloat(getHAState(ENTITY_IDS.darkHours));
 
 // Calculate parameters
 const SECONDS_IN_DAY = 24 * 60 * 60; 
@@ -220,14 +220,15 @@ function checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {
 // Enhanced logging for debugging
 function logDebugData() {
     if (debug) {
-        debugWarn("Is in irrigation window? " + inIrrigationWindow);
+        node.warn("Is in irrigation window? " + inIrrigationWindow);
         node.warn("Generative: " + generative);
-        debugWarn('Maintance Phase: '+ maintenancePhase)
-        node.warn("Dark hours: " + darkHours);
+        node.warn('Maintance Phase: '+ maintenancePhase)
+        node.warn("Dark Hours: " + darkHours);
         node.warn("Soil moisture: " + soilMoisture);
         node.warn("last Irrigation Run " + utcMsToLocalHHMMSS(lastChangedTimeMs));
         node.warn("Highest Sensor Value: " + highestSoilsensorVal);
         // Additional logging to help with debugging
+        //node.warn(moistureDifference);
         node.warn("timeSinceLastIrrigation: " + toHHMMSS(timeSinceLastIrrigation));
         node.warn("Current Time: " + new Date(currentTime * 1000).toISOString().substr(11, 8));
         node.warn("Irrigation Start: " + new Date(irrigationStart * 1000).toISOString().substr(11, 8));
@@ -235,12 +236,24 @@ function logDebugData() {
     }
 }
 
-
-// Modify all your node.warn calls to check the debug flag
+//function to make logbook entries
 function debugWarn(message) {
-    if (debug) {
-        node.warn(message);
-    }
+    // Create a message object with the payload for the api-call-service node
+    const logMessage = {
+        payload: {
+            service_domain: 'logbook',
+            service: 'log',
+            data: {
+                name: "Irrigation System",
+                message: message,
+                //entity_id: "logs"
+            }
+        }
+    };
+
+    // Send the message to the api-call-service node
+    // Assuming 'node.send()' is available in your function context to send the message
+    node.send([null, null, null, null, logMessage]);
 }
 
 function processControlFlow() {
@@ -248,7 +261,6 @@ function processControlFlow() {
     let delayAndTurnOffOutput = null;
     let flipBooleanOutput = null;
     let setInputNumberOutput = null;
-
     if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {
         debugWarn(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
         return [null, null, null, null];
@@ -260,7 +272,6 @@ function processControlFlow() {
         return setInputNumberOutput
     }
     const moistureDifference = DESIRED_MOISTURE - soilMoisture;
-
     if (moistureDifference > MAX_DELTA) {
         debugWarn("Max Dryback Feeding");
         turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
