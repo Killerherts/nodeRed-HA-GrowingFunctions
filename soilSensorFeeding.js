@@ -102,23 +102,6 @@ function convertTimeToSecondsUTC(timeString) {
     return hours * 3600 + minutes * 60 + seconds;
 }
 
-function convertUTCToLocalTime(utcMilliseconds) {
-    // Create a new Date object from the UTC milliseconds
-    const date = new Date(utcMilliseconds);
-
-    // Options for toLocaleTimeString to output time in HH:MM:SS format
-    const options = {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false // Use 24-hour format
-    };
-
-    // Convert to local time string with specified options
-    // @ts-ignore
-    return date.toLocaleTimeString('en-US', options);
-}
-
 // Function to retrieve state from Home Assistant
 function getHAState(state) {
     // Check if the states object and the specific state exist
