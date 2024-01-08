@@ -269,6 +269,7 @@ function processControlFlow() {
             let persistentError = buildPayload('create', 'persistent_notification', '', null, { message: errorMessage, title: 'Irrigation System'});
             node.send([null,null,null,null, persistentError]);
         });
+        return null;
     }
     
     if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {
