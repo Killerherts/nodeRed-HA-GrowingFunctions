@@ -29,6 +29,7 @@ const debug = true;
  * 
  */
 
+
 // For retrieving data:
 let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
 let generative = getHAState(ENTITY_IDS.generative);
@@ -230,9 +231,9 @@ function buildPayload(service, domain, entity_id, delay = null, data = {}) {
 // Whenever you want to build a payload in your processControlFlow function:
 // const payload = buildPayload('turn_on', 'switch', 'switch.your_p1_feed_id', DELAY_FOR_P1_FEED);
 
-
 //function to make logbook entries
 function logbookMsg(message) {
+    
     // Create a message object with the payload for the api-call-service node
     const logMessage = {
         payload: {
@@ -245,6 +246,7 @@ function logbookMsg(message) {
             }
         }
     };
+
     return logMessage;
 }
 
@@ -258,10 +260,14 @@ function processControlFlow() {
     let setInputNumberOutput = null;
 
     if (nullStates.length > 0) {
-    // Log and report each null state
+        // Log and report each null state
         nullStates.forEach(state => {
-            logOutput = logbookMsg('ERROR ERROR: ' + `${state} is null****************************`);
-            return[null,null,null,null, logOutput];
+            let errorMessage = `ERROR: ${state} is null`;
+            logOutput = logbookMsg(errorMessage);
+
+            // Create a persistent notification in Home Assistant
+            let persistentError = buildPayload('create', 'persistent_notification', '', null, { message: errorMessage, title: 'Irrigation System'});
+            node.send([null,null,null,null, persistentError]);
         });
     }
     
