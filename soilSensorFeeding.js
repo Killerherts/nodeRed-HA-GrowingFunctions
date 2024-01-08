@@ -29,6 +29,7 @@ const debug = true;
  * 
  */
 
+
 // For retrieving data:
 let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
 let generative = getHAState(ENTITY_IDS.generative);
@@ -40,7 +41,7 @@ let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
 
 // Calculate parameters
-const SECONDS_IN_DAY = 24 * 60 * 60; 
+const SECONDS_IN_DAY = 24 * 60 * 60;
 let lightOffTime = calculateLightOffTime(darkHours, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
 let irrigationEnd = calculateIrrigationEnd(lightOffTime);
@@ -115,7 +116,7 @@ function convertUTCToLocalTime(utcMilliseconds) {
 
     // Convert to local time string with specified options
     // @ts-ignore
-    return date.toLocaleTimeString( 'en-US', options);
+    return date.toLocaleTimeString('en-US', options);
 }
 
 // Function to retrieve state from Home Assistant
@@ -223,7 +224,7 @@ function logDebugData() {
     if (debug) {
         node.warn("Is in irrigation window? " + inIrrigationWindow);
         node.warn("Generative: " + generative);
-        node.warn('Maintance Phase: '+ maintenancePhase)
+        node.warn('Maintance Phase: ' + maintenancePhase)
         node.warn("Dark Hours: " + darkHours);
         node.warn("Soil moisture: " + soilMoisture);
         node.warn("last Irrigation Run " + utcMsToLocalHHMMSS(lastChangedTimeMs));
@@ -238,17 +239,20 @@ function logDebugData() {
 }
 
 //function to make logbook entries
-function debugWarn(message) {
+function logbookMsg(message) {
     // Create a message object with the payload for the api-call-service node
     const logMessage = {
         payload: {
             service_domain: 'logbook',
             service: 'log',
-            entity_id: ENTITY_IDS.feedPumpSwitch,
-            name: "Irrigation System",
-            message: message
+            data: {
+                entity_id: ENTITY_IDS.feedPumpSwitch,
+                name: "Irrigation System",
+                message: message
+            }
         }
     };
+    node.send([null, null, null, null, logMessage]);
 }
 
 function processControlFlow() {
@@ -257,7 +261,7 @@ function processControlFlow() {
     let flipBooleanOutput = null;
     let setInputNumberOutput = null;
     if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {
-        debugWarn(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
+        logbookMsg(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
         return [null, null, null, null];
     }
 
@@ -267,30 +271,30 @@ function processControlFlow() {
         return setInputNumberOutput
     }
 
-    
+
     if (moistureDifference > MAX_DELTA) {
-        debugWarn("Max Dryback Feeding");
+        logbookMsg("Max Dryback Feeding");
         turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
         delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
     } else if (inIrrigationWindow) {
         if (maintenancePhase == 'off') {
             if (highestSoilsensorVal >= DESIRED_MOISTURE) {
-                debugWarn('P2 Flip Switch');
+                logbookMsg('P2 Flip Switch');
                 flipBooleanOutput = buildPayload('turn_on', 'input_boolean', ENTITY_IDS.maintenancePhase);
             } else if (moistureDifference > P1_THRESHOLD) {
-                debugWarn('P1 feed');
+                logbookMsg('P1 feed');
                 turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
                 delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P1_FEED);
             }
         } else if (moistureDifference > P2_THRESHOLD) {
-            debugWarn('P2 feed');
+            logbookMsg('P2 feed');
             turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
             delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
         }
     }
     if (!inIrrigationWindow && maintenancePhase != 'off') {
-                debugWarn("Resetting Maintenance Switch");
-                flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
+        logbookMsg("Resetting Maintenance Switch");
+        flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
     }
     return [turnOnOutput, delayAndTurnOffOutput, flipBooleanOutput, setInputNumberOutput];
 }
