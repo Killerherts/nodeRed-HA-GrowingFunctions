@@ -13,20 +13,20 @@ const ENTITY_IDS = {
     feedPumpSwitch: 'switch.side_1_feed_pump_switch'
 };
 
-const MIN_IRRIGATION_FREQUENCY = 10 * 60; // 10 minutes in seconds
+const MIN_IRRIGATION_FREQUENCY = 6 * 60; // 10 minutes in seconds
 const DESIRED_MOISTURE = 45; // Desired moisture level in water content percentage
 const P1_THRESHOLD = 2;
 const P2_THRESHOLD = 7; //dryback % before sending a p2
-const MAX_DELTA = 25; //max dryback overnight
-const DELAY_FOR_P1_FEED = 19;  // in seconds
-const DELAY_FOR_P2_FEED = 45;  // in seconds
-const debug = false;
+const MAX_DELTA = 22; //max dryback overnight
+const DELAY_FOR_P1_FEED = 13;  // in seconds
+const DELAY_FOR_P2_FEED = 18;  // in seconds
+const debug = true;
 /**
- *
- * Nothing needs to be changed under this section unless your modifing
- * the basic functionality or how the script works.
+ * 
+ * Nothing needs to be changed under this section unless your modifing 
+ * the basic functionality or how the script works. 
  * Modifiy at your own risk
- *
+ * 
  */
 
 // For retrieving data:
@@ -40,7 +40,7 @@ let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
 
 // Calculate parameters
-const SECONDS_IN_DAY = 24 * 60 * 60;
+const SECONDS_IN_DAY = 24 * 60 * 60; 
 let lightOffTime = calculateLightOffTime(darkHours, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
 let irrigationEnd = calculateIrrigationEnd(lightOffTime);
@@ -48,6 +48,7 @@ let lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.state
 let lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);
 let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
 let timeSinceLastIrrigation;
+let moistureDifference = DESIRED_MOISTURE - soilMoisture;
 
 if (lastChanged < currentTimeUTC) {
     timeSinceLastIrrigation = Math.floor(currentTimeUTC - lastChanged);
@@ -134,7 +135,7 @@ function getHAState(state) {
 
 /**
  * Constructs a payload for Home Assistant service calls.
- *
+ * 
  * @param {string} service - The service to be called (e.g., 'turn_on', 'turn_off').
  * @param {string} domain - The domain of the entity (e.g., 'switch', 'light').
  * @param {string} entity_id - The id of the entity to be acted upon.
@@ -228,7 +229,7 @@ function logDebugData() {
         node.warn("last Irrigation Run " + utcMsToLocalHHMMSS(lastChangedTimeMs));
         node.warn("Highest Sensor Value: " + highestSoilsensorVal);
         // Additional logging to help with debugging
-        //node.warn(moistureDifference);
+        node.warn("Moisture Difference: " + moistureDifference);
         node.warn("timeSinceLastIrrigation: " + toHHMMSS(timeSinceLastIrrigation));
         node.warn("Current Time: " + new Date(currentTime * 1000).toISOString().substr(11, 8));
         node.warn("Irrigation Start: " + new Date(irrigationStart * 1000).toISOString().substr(11, 8));
@@ -239,21 +240,15 @@ function logDebugData() {
 //function to make logbook entries
 function debugWarn(message) {
     // Create a message object with the payload for the api-call-service node
-    let entry =node.warn(ENTITY_IDS.feedPumpSwitch)
     const logMessage = {
         payload: {
             service_domain: 'logbook',
             service: 'log',
             entity_id: ENTITY_IDS.feedPumpSwitch,
-            data: {
-                name: "Irrigation System",
-                message: message,
-            }
+            name: "Irrigation System",
+            message: message
         }
     };
-    // Send the message to the api-call-service node
-    // Assuming 'node.send()' is available in your function context to send the message
-    node.send(logMessage);
 }
 
 function processControlFlow() {
@@ -271,7 +266,8 @@ function processControlFlow() {
         setInputNumberOutput = buildPayload('set_value', 'input_number', ENTITY_IDS.highestSoilSensor, null, { value: 0 });  // Reset highestSoilSensor value to 0
         return setInputNumberOutput
     }
-    const moistureDifference = DESIRED_MOISTURE - soilMoisture;
+
+    
     if (moistureDifference > MAX_DELTA) {
         debugWarn("Max Dryback Feeding");
         turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
