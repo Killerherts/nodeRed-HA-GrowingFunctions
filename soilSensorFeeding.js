@@ -19,7 +19,7 @@ const P1_THRESHOLD = 2;
 const P2_THRESHOLD = 7; //dryback % before sending a p2
 const MAX_DELTA = 22; //max dryback overnight
 const DELAY_FOR_P1_FEED = 13;  // in seconds
-const DELAY_FOR_P2_FEED = 18;  // in seconds
+const DELAY_FOR_P2_FEED = 21;  // in seconds
 const debug = true;
 /**
  * 
@@ -28,7 +28,6 @@ const debug = true;
  * Modifiy at your own risk
  * 
  */
-
 
 // For retrieving data:
 let highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);
@@ -102,6 +101,7 @@ function convertTimeToSecondsUTC(timeString) {
     return hours * 3600 + minutes * 60 + seconds;
 }
 
+
 // Function to retrieve state from Home Assistant
 function getHAState(state) {
     // Check if the states object and the specific state exist
@@ -115,40 +115,6 @@ function getHAState(state) {
         return null; // or you can throw an error or return a default value
     }
 }
-
-
-/**
- * Constructs a payload for Home Assistant service calls.
- * 
- * @param {string} service - The service to be called (e.g., 'turn_on', 'turn_off').
- * @param {string} domain - The domain of the entity (e.g., 'switch', 'light').
- * @param {string} entity_id - The id of the entity to be acted upon.
- * @param {number} delay - The delay in seconds before the action is performed.
- * @param {object} data - Any additional data to be passed along with the service call.
- * @returns {object} - The constructed payload.
- */
-function buildPayload(service, domain, entity_id, delay = null, data = {}) {
-    let payload = {
-        service: service,
-        domain: domain,
-        entity_id: entity_id,
-        data: data
-    };
-
-    let message = {
-        payload: payload
-    };
-
-    if (delay !== null) {
-        message.delay = delay * 1000; // Convert seconds to milliseconds
-    }
-
-    return message;
-}
-// Whenever you want to build a payload in your processControlFlow function:
-// const payload = buildPayload('turn_on', 'switch', 'switch.your_p1_feed_id', DELAY_FOR_P1_FEED);
-
-
 
 // Function to get current time in seconds
 function getCurrentTime() {
@@ -221,6 +187,38 @@ function logDebugData() {
     }
 }
 
+/**
+ * Constructs a payload for Home Assistant service calls.
+ * 
+ * @param {string} service - The service to be called (e.g., 'turn_on', 'turn_off').
+ * @param {string} domain - The domain of the entity (e.g., 'switch', 'light').
+ * @param {string} entity_id - The id of the entity to be acted upon.
+ * @param {number} delay - The delay in seconds before the action is performed.
+ * @param {object} data - Any additional data to be passed along with the service call.
+ * @returns {object} - The constructed payload.
+ */
+function buildPayload(service, domain, entity_id, delay = null, data = {}) {
+    let payload = {
+        service: service,
+        domain: domain,
+        entity_id: entity_id,
+        data: data
+    };
+
+    let message = {
+        payload: payload
+    };
+
+    if (delay !== null) {
+        message.delay = delay * 1000; // Convert seconds to milliseconds
+    }
+
+    return message;
+}
+// Whenever you want to build a payload in your processControlFlow function:
+// const payload = buildPayload('turn_on', 'switch', 'switch.your_p1_feed_id', DELAY_FOR_P1_FEED);
+
+
 //function to make logbook entries
 function logbookMsg(message) {
     // Create a message object with the payload for the api-call-service node
@@ -235,10 +233,11 @@ function logbookMsg(message) {
             }
         }
     };
-    node.send([null, null, null, null, logMessage]);
+    return logMessage;
 }
 
 function processControlFlow() {
+    let logOutput = null;
     let turnOnOutput = null;
     let delayAndTurnOffOutput = null;
     let flipBooleanOutput = null;
@@ -256,30 +255,30 @@ function processControlFlow() {
 
 
     if (moistureDifference > MAX_DELTA) {
-        logbookMsg("Max Dryback Feeding");
+        logOutput = logbookMsg("Max Dryback Feeding");
         turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
         delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
     } else if (inIrrigationWindow) {
         if (maintenancePhase == 'off') {
             if (highestSoilsensorVal >= DESIRED_MOISTURE) {
-                logbookMsg('P2 Flip Switch');
+                logOutput = logbookMsg('P2 Flip Switch');
                 flipBooleanOutput = buildPayload('turn_on', 'input_boolean', ENTITY_IDS.maintenancePhase);
             } else if (moistureDifference > P1_THRESHOLD) {
-                logbookMsg('P1 feed');
+                logOutput = logbookMsg('P1 feed');
                 turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
                 delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P1_FEED);
             }
         } else if (moistureDifference > P2_THRESHOLD) {
-            logbookMsg('P2 feed');
+            logOutput = logbookMsg('P2 feed');
             turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
             delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);
         }
     }
     if (!inIrrigationWindow && maintenancePhase != 'off') {
-        logbookMsg("Resetting Maintenance Switch");
+        logOutput = logbookMsg("Resetting Maintenance Switch");
         flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
     }
-    return [turnOnOutput, delayAndTurnOffOutput, flipBooleanOutput, setInputNumberOutput];
+    return [turnOnOutput, delayAndTurnOffOutput, flipBooleanOutput, setInputNumberOutput, logOutput];
 }
 
 logDebugData()
