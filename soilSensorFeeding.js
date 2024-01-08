@@ -40,7 +40,7 @@ let currentTime = getCurrentTime();
 let currentTimeUTC = getCurrentTimeUTC();
 
 // Calculate parameters
-const SECONDS_IN_DAY = 24 * 60 * 60;
+const SECONDS_IN_DAY = 24 * 60 * 60; 
 let lightOffTime = calculateLightOffTime(darkHours, lightOnTime);
 let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
 let irrigationEnd = calculateIrrigationEnd(lightOffTime);
@@ -151,7 +151,6 @@ function calculateIrrigationStart(generative, lightOnTime) {
 }
 
 
-
 function checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {
     // Normalize times to a 24-hour cycle to handle cases where times span across midnight
     currentTime = currentTime % SECONDS_IN_DAY;
@@ -167,13 +166,26 @@ function checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {
         return currentTime >= irrigationStart || currentTime < irrigationEnd;
     }
 }
+//check for null states
+function checkForNullStates() {
+    let nullStates = [];
+
+    if (highestSoilsensorVal === null) nullStates.push("highestSoilsensorVal");
+    if (generative === null) nullStates.push("generative");
+    if (darkHours === null) nullStates.push("darkHours");
+    if (lightOnTime === null) nullStates.push("lightOnTime");
+    if (soilMoisture === null) nullStates.push("soilMoisture");
+    if (maintenancePhase === null) nullStates.push("maintenancePhase");
+
+    return nullStates; // Returns an array of null state names, empty if none are null
+}
 
 // Enhanced logging for debugging
 function logDebugData() {
     if (debug) {
         node.warn("Is in irrigation window? " + inIrrigationWindow);
         node.warn("Generative: " + generative);
-        node.warn('Maintance Phase: ' + maintenancePhase)
+        node.warn('Maintance Phase: '+ maintenancePhase)
         node.warn("Dark Hours: " + darkHours);
         node.warn("Soil moisture: " + soilMoisture);
         node.warn("last Irrigation Run " + utcMsToLocalHHMMSS(lastChangedTimeMs));
@@ -227,9 +239,9 @@ function logbookMsg(message) {
             service_domain: 'logbook',
             service: 'log',
             data: {
-                entity_id: ENTITY_IDS.feedPumpSwitch,
-                name: "Irrigation System",
-                message: message
+            entity_id: ENTITY_IDS.feedPumpSwitch,
+            name: "Irrigation System",
+            message: message
             }
         }
     };
@@ -237,11 +249,22 @@ function logbookMsg(message) {
 }
 
 function processControlFlow() {
+
+    const nullStates = checkForNullStates();
     let logOutput = null;
     let turnOnOutput = null;
     let delayAndTurnOffOutput = null;
     let flipBooleanOutput = null;
     let setInputNumberOutput = null;
+
+    if (nullStates.length > 0) {
+    // Log and report each null state
+        nullStates.forEach(state => {
+            logOutput = logbookMsg('ERROR ERROR: ' + `${state} is null****************************`);
+            return[null,null,null,null, logOutput];
+        });
+    }
+    
     if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {
         logbookMsg(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
         return [null, null, null, null];
@@ -249,11 +272,12 @@ function processControlFlow() {
 
     //reset highest soil value sensor at beginging of lights on
     if (Math.abs(currentTimeUTC - lightOnTime) < 60) {
+        logOutput = logbookMsg("Flipping Highest Soil Sensor to 0");
         setInputNumberOutput = buildPayload('set_value', 'input_number', ENTITY_IDS.highestSoilSensor, null, { value: 0 });  // Reset highestSoilSensor value to 0
         return setInputNumberOutput
     }
 
-
+    
     if (moistureDifference > MAX_DELTA) {
         logOutput = logbookMsg("Max Dryback Feeding");
         turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);
@@ -275,8 +299,8 @@ function processControlFlow() {
         }
     }
     if (!inIrrigationWindow && maintenancePhase != 'off') {
-        logOutput = logbookMsg("Resetting Maintenance Switch");
-        flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
+                logOutput = logbookMsg("Resetting Maintenance Switch");
+                flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
     }
     return [turnOnOutput, delayAndTurnOffOutput, flipBooleanOutput, setInputNumberOutput, logOutput];
 }
