@@ -5,9 +5,11 @@
 // Constants for Home Assistant Entity IDs
 const ENTITY_IDS = {
     heaterPumpSwitch: 'switch.heater_pump',
-    maxTempSensor: 'sensor.max_temp',
+    minLightsOnTemp: 'input_number.min_lights_on_temp',
+    minLightsOffTemp: 'input_number.min_lights_off_temp',
     roomTempSensor: 'sensor.room_temp',
-
+    lightOnTime: 'input_datetime.light_on_time',
+    darkHours: 'input_number.side_1_dark_hours',
 };
 
 const delta= 2;  //delta before turning on heater
@@ -16,8 +18,12 @@ const debug = true;
 
 // For retrieving data:
 let roomTempSensor = getHAState(ENTITY_IDS.roomTempSensor);
-let maxTempSensor = getHAState(ENTITY_IDS.maxTempSensor);
+let minLightsOnTemp = getHAState(ENTITY_IDS.minLightsOnTemp);
+let minLightsOffTemp = getHAState(ENTITY_IDS.minLightsOffTemp);
 let heaterPumpSwitch = getHAState(ENTITY_IDS.heaterPumpSwitch);
+let lightOnTime = getHAState(ENTITY_IDS.lightOnTime);
+let darkHours = getHAState(ENTITY_IDS.darkHours);
+
 /**
  * 
  * Nothing needs to be changed under this section unless your modifing 
@@ -40,8 +46,6 @@ function getHAState(state) {
     }
 }
 
-
-
 //check for null states
 function checkForNullStates() {
     let nullStates = [];
@@ -49,7 +53,10 @@ function checkForNullStates() {
     if (maxTempSensor === null) nullStates.push("MaxTempSensor");
     if (roomTempSensor === null) nullStates.push("RoomTempSensor");
     if (heaterPumpSwitch === null) nullStates.push("heaterPumpSwitch");
-
+    if (minLightsOnTemp === null) nullStates.push("minLightsOnTemp");
+    if (minLightsOffTemp === null) nullStates.push("minLightsOffTemp");
+    if (lightOnTime === null) nullStates.push("lightOnTime");
+    if (darkHours === null) nullStates.push("darkHours");
     return nullStates; // Returns an array of null state names, empty if none are null
 }
 
@@ -62,6 +69,11 @@ function logDebugData() {
         node.warn("Room Temp Sensor: " + roomTempSensor); //room temp
         node.warn("Max Temp Sensor: " + maxTempSensor); 
         node.warn("Heater Pump Switch: " + heaterPumpSwitch);
+        node.warn("Min Lights On Temp: " + minLightsOnTemp);
+        node.warn("Min Lights Off Temp: " + minLightsOffTemp);
+        node.warn("Light On Time: " + lightOnTime);
+        node.warn("Dark Hours: " + darkHours);
+        node.warn("Is Lights On Time: " + checkLightsOnTime());
     }
 }
 
@@ -113,34 +125,84 @@ function buildPayload(service, domain, entity_id, delay = null, data = {}) {
 
     return message;
 }
+//check if lights are on
+function checkLightsOnTime() {
+    let currentTime = new Date();
+    let currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
-function  processControlFlow() {
+    // Convert lightOnTime to minutes since midnight
+    let [onHours, onMinutes] = lightOnTime.split(':').map(Number);
+    let lightOnMinutes = onHours * 60 + onMinutes;
+
+    // Calculate light off time in minutes since midnight
+    let lightOffMinutes = lightOnMinutes + darkHours * 60;
+
+    // Adjust for crossing midnight
+    if (lightOffMinutes >= 1440) {
+        lightOffMinutes -= 1440;
+    }
+
+    // Check if current time is between light on and off times
+    let isLightsOnTime = false;
+    if (lightOffMinutes > lightOnMinutes) {
+        // Normal day scenario
+        isLightsOnTime = currentMinutes >= lightOnMinutes && currentMinutes <= lightOffMinutes;
+    } else {
+        // Crosses midnight
+        isLightsOnTime = currentMinutes >= lightOnMinutes || currentMinutes <= lightOffMinutes;
+    }
+
+    return isLightsOnTime;
+}
+
+
+function decideHeaterAction(currentTemp, desiredTemp, heaterState) {
+    if (currentTemp < desiredTemp - delta && heaterState === 'off') {
+        return 'turn_on';
+    } else if (currentTemp >= desiredTemp && heaterState === 'on') {
+        return 'turn_off';
+    }
+    return null;
+}
+function generateLogMessage(type, details) {
+    if (type === 'error') {
+        return `ERROR: ${details} is null`;
+    } else if (type === 'action') {
+        const { action, currentTemp, desiredTemp } = details;
+        if (action === 'turn_on') {
+            return `Heater Turned On - Room Temp: ${currentTemp}, Desired Temp: ${desiredTemp}`;
+        } else if (action === 'turn_off') {
+            return `Heater Turned Off - Room Temp: ${currentTemp}, Desired Temp: ${desiredTemp}`;
+        }
+    }
+    return 'No action required';
+}
+
+function processControlFlow() {
     const nullStates = checkForNullStates();
-    // Get the current state of the heater pump switch
     let logOutput = null;
-    let operateHeater = null;
 
     if (nullStates.length > 0) {
-        // Log and report each null state
         nullStates.forEach(state => {
-            let errorMessage = `ERROR: ${state} is null`;
+            let errorMessage = generateLogMessage('error', state);
             logOutput = logbookMsg(errorMessage);
-
-            // Create a persistent notification in Home Assistant
             let persistentError = buildPayload('create', 'persistent_notification', '', null, { message: errorMessage, title: 'Heating System Error'});
             node.send([null, persistentError]);
         });
         return null;
     }
-    
-    if (roomTempSensor < maxTempSensor - delta && heaterPumpSwitch === 'off') {
-        operateHeater = buildPayload('turn_on', 'switch', ENTITY_IDS.heaterPumpSwitch);
-        logOutput = logbookMsg("Heater Turned On "+ roomTempSensor + " Max Temp " + maxTempSensor);
+
+    let desiredTemp = checkLightsOnTime() ? minLightsOnTemp : minLightsOffTemp;
+    let action = decideHeaterAction(roomTempSensor, desiredTemp, heaterPumpSwitch);
+
+    if (action) {
+        let actionDetails = { action, currentTemp: roomTempSensor, desiredTemp };
+        let actionMessage = generateLogMessage('action', actionDetails);
+        logOutput = logbookMsg(actionMessage);
+        let operateHeater = buildPayload(action, 'switch', ENTITY_IDS.heaterPumpSwitch);
+
         node.send([operateHeater, logOutput]);
-    } else if (roomTempSensor => maxTempSensor && heaterPumpSwitch === 'on') {
-        operateHeater = buildPayload('turn_off', 'switch', ENTITY_IDS.heaterPumpSwitch);
-        logOutput = logbookMsg("Heater Turned Off "+ roomTempSensor + " Max Temp " + maxTempSensor);
     }
 }
-
 processControlFlow();
+logDebugData();
