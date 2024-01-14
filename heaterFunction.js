@@ -32,6 +32,7 @@ let darkHours = getHAState(ENTITY_IDS.darkHours);
  * 
  */
 
+
 // Function to retrieve state from Home Assistant
 function getHAState(state) {
     // Check if the states object and the specific state exist
@@ -50,7 +51,6 @@ function getHAState(state) {
 function checkForNullStates() {
     let nullStates = [];
 
-    if (maxTempSensor === null) nullStates.push("MaxTempSensor");
     if (roomTempSensor === null) nullStates.push("RoomTempSensor");
     if (heaterPumpSwitch === null) nullStates.push("heaterPumpSwitch");
     if (minLightsOnTemp === null) nullStates.push("minLightsOnTemp");
@@ -67,7 +67,6 @@ function checkForNullStates() {
 function logDebugData() {
     if (debug) {
         node.warn("Room Temp Sensor: " + roomTempSensor); //room temp
-        node.warn("Max Temp Sensor: " + maxTempSensor); 
         node.warn("Heater Pump Switch: " + heaterPumpSwitch);
         node.warn("Min Lights On Temp: " + minLightsOnTemp);
         node.warn("Min Lights Off Temp: " + minLightsOffTemp);
@@ -125,34 +124,30 @@ function buildPayload(service, domain, entity_id, delay = null, data = {}) {
 
     return message;
 }
-//check if lights are on
+
 function checkLightsOnTime() {
     let currentTime = new Date();
     let currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
-    // Convert lightOnTime to minutes since midnight
+    // Convert lightOnTime and darkHours to minutes since midnight
     let [onHours, onMinutes] = lightOnTime.split(':').map(Number);
     let lightOnMinutes = onHours * 60 + onMinutes;
+    let darkMinutes = darkHours * 60;
 
     // Calculate light off time in minutes since midnight
-    let lightOffMinutes = lightOnMinutes + darkHours * 60;
+    let lightOffMinutes = lightOnMinutes + darkMinutes;
 
-    // Adjust for crossing midnight
-    if (lightOffMinutes >= 1440) {
-        lightOffMinutes -= 1440;
-    }
+    // Adjust light off time for crossing midnight
+    lightOffMinutes = lightOffMinutes % 1440;
 
-    // Check if current time is between light on and off times
-    let isLightsOnTime = false;
-    if (lightOffMinutes > lightOnMinutes) {
-        // Normal day scenario
-        isLightsOnTime = currentMinutes >= lightOnMinutes && currentMinutes <= lightOffMinutes;
+    // Check if current time is within the lights on period
+    if (lightOnMinutes <= lightOffMinutes) {
+        // Scenario where light on and off times are within the same day
+        return currentMinutes >= lightOnMinutes && currentMinutes < lightOffMinutes;
     } else {
-        // Crosses midnight
-        isLightsOnTime = currentMinutes >= lightOnMinutes || currentMinutes <= lightOffMinutes;
+        // Scenario where light on time is today and off time is tomorrow
+        return currentMinutes >= lightOnMinutes || currentMinutes < lightOffMinutes;
     }
-
-    return isLightsOnTime;
 }
 
 
