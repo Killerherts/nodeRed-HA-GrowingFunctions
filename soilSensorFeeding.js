@@ -41,12 +41,12 @@ let soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));
 
 // Calculate parameters
 const SECONDS_IN_DAY = 24 * 60 * 60; 
-let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
-let irrigationEnd = calculateIrrigationEnd(lightOffTime);
-let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
-let lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);
 let lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.states[ENTITY_IDS.feedPumpSwitch].last_changed).getTime();
 let lightOffTime = calculateLightOffTime(darkHours, lightOnTime);
+let irrigationEnd = calculateIrrigationEnd(lightOffTime);
+let irrigationStart = calculateIrrigationStart(generative, lightOnTime);
+let inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);
+let lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);
 let moistureDifference = DESIRED_MOISTURE - soilMoisture;
 let timeSinceLastIrrigation;
 
@@ -336,12 +336,15 @@ function processControlFlow() {
 
 logDebugData();
 checkForNullStates();
-minStopTime();
-maxDrybackCheck();
-setMaxSoilSensorTracker();
+
+if (!minStopTime()) {
+    maxDrybackCheck();
+    setMaxSoilSensorTracker();
+}
+
 resetMaintenancePhase();
 switchMaintenancePhase();
 // Run the processControlFlow function if in the irrigation window
-if (inIrrigationWindow) {
+if (inIrrigationWindow && !minStopTime()) {
     processControlFlow();
 }
