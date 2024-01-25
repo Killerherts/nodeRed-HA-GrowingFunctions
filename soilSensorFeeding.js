@@ -256,6 +256,7 @@ function minStopTime() {
         node.send([null,null,null,null, logOutput]);
         return true;
     }
+return false;
 }
 
 //check for max dryback
@@ -267,6 +268,7 @@ function maxDrybackCheck() {
         node.send([turnOnOutput, delayAndTurnOffOutput, null, null, logOutput]);
         return true;
     }
+return false;
 }
 //reset maintenance phase if outside irrigation window and it is on
 function resetMaintenancePhase() {
@@ -275,18 +277,20 @@ function resetMaintenancePhase() {
         flipBooleanOutput = buildPayload('turn_off', 'input_boolean', ENTITY_IDS.maintenancePhase);
         node.send([null, null, flipBooleanOutput, null, logOutput]);
     }
-
+return false;
 }
 
 //reset highest soil sensor at beginging of lights on
 function setMaxSoilSensorTracker() {
+    //node.warn("set soil warn" + (currentTime -lightOnTime))
     //reset highest soil value sensor at beginging of lights on
-    if (Math.abs(currentTimeUTC - lightOnTime) <= 60) {
+    if (Math.abs(currentTime - lightOnTime) <= 60) {
         logOutput = logbookMsg("Flipping Highest Soil Sensor to 0");
         setInputNumberOutput = buildPayload('set_value', 'input_number', ENTITY_IDS.highestSoilSensor, null, { value: 0 });
         node.send([null, null, null, setInputNumberOutput, logOutput]);
         return true;
     }
+return false;
 }
 
 //switch maintenance phase if in irrigation window and desired moisture is reached
@@ -296,8 +300,10 @@ function switchMaintenancePhase() {
             logOutput = logbookMsg('P2 Flip Switch Desired Moisture Reached');
             flipBooleanOutput = buildPayload('turn_on', 'input_boolean', ENTITY_IDS.maintenancePhase);
             node.send ([null, null, flipBooleanOutput, null, logOutput]);
+            return true;
         }
     }
+return false;
 }
 //convert seconds to HH:MM:SS for output only
 function toHHMMSS(timeSeconds) {
@@ -336,15 +342,13 @@ function processControlFlow() {
 
 logDebugData();
 checkForNullStates();
-
-if (!minStopTime()) {
-    maxDrybackCheck();
-    setMaxSoilSensorTracker();
-}
-
-resetMaintenancePhase();
+setMaxSoilSensorTracker();
 switchMaintenancePhase();
-// Run the processControlFlow function if in the irrigation window
-if (inIrrigationWindow && !minStopTime()) {
-    processControlFlow();
+if (!minStopTime()) {
+    if (!maxDrybackCheck()) {
+        if (inIrrigationWindow) {
+            processControlFlow();
+        }
+    }   
 }
+resetMaintenancePhase();
