@@ -252,7 +252,7 @@ function logbookMsg(message) {
 //check for min time between irrigation
 function minStopTime() {
     if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {
-        logbookMsg(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
+        logOutput = logbookMsg(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);
         node.send([null,null,null,null, logOutput]);
         return true;
     }
