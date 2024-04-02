@@ -1,0 +1,1216 @@
+#this is my new flow this uses the node red companion app to create the numbers needed to track run over run
+
+[
+  {
+    "id": "a826652fd99df3a0",
+    "type": "tab",
+    "label": "Side 1 Table 2",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "622f938ac9ea8985",
+    "type": "ha-number",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 P2 Dryback",
+    "version": 1,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "3b1aac4b8e11aa97",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 150,
+    "y": 540,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "11a72986cd0a2d28",
+    "type": "ha-number",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2  Moisture Target",
+    "version": 1,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "52b67ba70833bf17",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 480,
+    "y": 600,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "2fca0e10d564705a",
+    "type": "ha-number",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 P1 Shot Size",
+    "version": 1,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "7af6402dfb23d731",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 160,
+    "y": 600,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "ef049ab80baf0500",
+    "type": "ha-number",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 P2 Shot Size",
+    "version": 1,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "b2ddf247d46cd1eb",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 720,
+    "y": 540,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "fe767c9a8fa33dbe",
+    "type": "ha-number",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 Dark Hours",
+    "version": 1,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "091ba25d13f32e9f",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 790,
+    "y": 600,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "f8c51d0074321534",
+    "type": "function",
+    "z": "a826652fd99df3a0",
+    "name": "Feed By WC",
+    "func": "/**One thhing of note I use a traditional automation to update my\n * highest soil sensor. I find this is easy just to do through the gui\n */\n\n// Constants for Home Assistant Entity IDs\nconst ENTITY_IDS = {\n    highestSoilSensor: 'number.side_1_table_2_highest_soil',\n    generative: 'switch.side_1_table_2_generative',\n    darkHours: 'number.side_1_table_2_dark_hours',\n    lightOnTime: 'time.side_1_table_2_lights_on_time',\n    soilMoisture: 'sensor.vwc_b1_soil_sensor',\n    maintenancePhase: 'switch.side_1_table_2_maintenance_phase',\n    feedPumpSwitch: 'switch.side_1_table_2_feed_pump',\n    p2ShotSize: 'number.side_1_table_2_p2_delay',\n    p1ShotSize: 'number.side_1_table_2_p1_delay',\n    maxDelta: 'number.side_1_table_2_max_drybacks',\n    p2Dryback: 'number.side_1_table_2_p2_dryback',\n    targetMoisture: 'number.side_1_table_2_moisture_target'\n};\n\nconst MIN_IRRIGATION_FREQUENCY = 6 * 60; // 10 minutes in seconds\nconst debug = false;\n/**\n * \n * Nothing needs to be changed under this section unless your modifing \n * the basic functionality or how the script works. \n * Modifiy at your own risk\n * \n */\n\n// For retrieving data:\nconst DESIRED_MOISTURE = getHAState(ENTITY_IDS.targetMoisture);\nconst P1_THRESHOLD = 2; //close enough to desired moisture without blowing over\nconst P2_THRESHOLD = getHAState(ENTITY_IDS.p2Dryback);\nconst MAX_DELTA = getHAState(ENTITY_IDS.maxDelta);\nconst DELAY_FOR_P1_FEED = getHAState(ENTITY_IDS.p1ShotSize);\nconst DELAY_FOR_P2_FEED = getHAState(ENTITY_IDS.p2ShotSize);\n\n\n// For retrieving data:\nlet currentTime = getCurrentTime();\nlet currentTimeUTC = getCurrentTimeUTC();\nlet darkHours = parseFloat(getHAState(ENTITY_IDS.darkHours));\nlet generative = getHAState(ENTITY_IDS.generative);\nlet highestSoilsensorVal = getHAState(ENTITY_IDS.highestSoilSensor);\nlet lightOnTime = convertTimeToSecondsUTC(getHAState(ENTITY_IDS.lightOnTime));\nlet maintenancePhase = getHAState(ENTITY_IDS.maintenancePhase);\nlet soilMoisture = parseFloat(getHAState(ENTITY_IDS.soilMoisture));\n\n// Calculate parameters\nconst SECONDS_IN_DAY = 24 * 60 * 60; \nlet lastChangedTimeMs = new Date(global.get('homeassistant').homeAssistant.states[ENTITY_IDS.feedPumpSwitch].last_changed).getTime();\nlet lightOffTime = calculateLightOffTime(darkHours, lightOnTime);\nlet irrigationEnd = calculateIrrigationEnd(lightOffTime);\nlet irrigationStart = calculateIrrigationStart(generative, lightOnTime);\nlet inIrrigationWindow = checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd);\nlet lastChanged = convert_epoch_to_utc_seconds(lastChangedTimeMs);\nlet moistureDifference = DESIRED_MOISTURE - soilMoisture;\nlet timeSinceLastIrrigation;\n\n//store payloads\nlet delayAndTurnOffOutput = null;\nlet flipBooleanOutput = null;\nlet logOutput = null;\nlet setInputNumberOutput = null;\nlet turnOnOutput = null;\n\n\n//handle midnight crossover\nif (lastChanged < currentTimeUTC) {\n    timeSinceLastIrrigation = Math.floor(currentTimeUTC - lastChanged);\n} else {\n    timeSinceLastIrrigation = Math.floor((SECONDS_IN_DAY - lastChanged) + currentTimeUTC);\n}\n\n/**\n * Constructs a payload for Home Assistant service calls.\n * \n * @param {string} service - The service to be called (e.g., 'turn_on', 'turn_off').\n * @param {string} domain - The domain of the entity (e.g., 'switch', 'light').\n * @param {string} entity_id - The id of the entity to be acted upon.\n * @param {number} delay - The delay in seconds before the action is performed.\n * @param {object} data - Any additional data to be passed along with the service call.\n * @returns {object} - The constructed payload.\n */\nfunction buildPayload(service, domain, entity_id, delay = null, data = {}) {\n    let payload = {\n        service: service,\n        domain: domain,\n        entity_id: entity_id,\n        data: data\n    };\n\n    let message = {\n        payload: payload\n    };\n\n    if (delay !== null) {\n        message.delay = delay * 1000; // Convert seconds to milliseconds\n    }\n\n    return message;\n}\n// Whenever you want to build a payload in your processControlFlow function:\n// const payload = buildPayload('turn_on', 'switch', 'switch.your_p1_feed_id', DELAY_FOR_P1_FEED);\n\n//calculate irrigation end time\nfunction calculateIrrigationEnd(lightOffTime) {\n    if (generative == 'on') {\n        return lightOffTime - 2 * 60 * 60;\n    } else {\n        return lightOffTime - 60 * 60;\n    }\n}\n\n// Function to calculate irrigation start time dynamically based on lights on time\nfunction calculateIrrigationStart(generative, lightOnTime) {\n    let irrigationStart = lightOnTime;\n    if (generative == \"on\") {\n        irrigationStart = irrigationStart + (2 * 60 * 60); // Add 2 hours for generative steering\n    } else {\n        // Use a default start time if generative is not enabled\n        irrigationStart = irrigationStart + (60 * 60); // Add 1 hour\n    }\n    return irrigationStart;\n}\n\n//check for null states\nfunction checkForNullStates() {\n    const requiredStates = [\"highestSoilsensorVal\", \"generative\", \"darkHours\", \"lightOnTime\", \"soilMoisture\", \"maintenancePhase\"];\n\n    const nullStates = requiredStates.filter(state => eval(state) === null);\n\n    if (nullStates.length > 0) {\n        // Log and report each null state\n        nullStates.forEach(state => {\n            const errorMessage = `ERROR: ${state} is null`;\n            logOutput = logbookMsg(errorMessage);\n\n            // Create a persistent notification in Home Assistant\n            const persistentError = buildPayload('create', 'persistent_notification', '', null, { message: errorMessage, title: 'Irrigation System'});\n            node.send([null,null,null,null, persistentError]);\n        });\n        return true;\n    }\n}\n\n//converts lastchangems to seconds\nfunction convert_epoch_to_utc_seconds(epoch_ms) {\n    const epoch_seconds = epoch_ms / 1000;\n    const seconds_into_day_utc = Math.floor(epoch_seconds % SECONDS_IN_DAY);\n    return seconds_into_day_utc;\n}\n\n// Function to convert a time string in the format HH:MM:SS to seconds from midnight\nfunction convertTimeToSecondsUTC(timeString) {\n    // Split the time string by ':' to get hours, minutes, and seconds\n    const parts = timeString.split(':');\n    const hours = parseInt(parts[0], 10);\n    const minutes = parseInt(parts[1], 10);\n    const seconds = parseInt(parts[2], 10);\n\n    // Calculate the total number of seconds from midnight\n    return hours * 3600 + minutes * 60 + seconds;\n}\n\n// Function to calculate light off time dynamically based on dark hours\nfunction calculateLightOffTime(darkHours, lightOnTime) {\n    let lightDuration = (24 - darkHours) * 60 * 60; // Calculate light duration based on dark hours\n    let lightOffTime = (lightOnTime + lightDuration) % SECONDS_IN_DAY; // Adjust for midnight crossover\n\n    return lightOffTime;\n}\n\n// Function to check if the current time is within the irrigation window\nfunction checkInIrrigationWindow(currentTime, irrigationStart, irrigationEnd) {\n    // Normalize times to a 24-hour cycle to handle cases where times span across midnight\n    currentTime = currentTime % SECONDS_IN_DAY;\n    irrigationStart = irrigationStart % SECONDS_IN_DAY;\n    irrigationEnd = irrigationEnd % SECONDS_IN_DAY;\n\n    if (irrigationStart < irrigationEnd) {\n        // The irrigation window does not span midnight\n        return currentTime >= irrigationStart && currentTime < irrigationEnd;\n    } else {\n        // The irrigation window spans midnight\n        // currentTime must be either after irrigationStart on the same day or before irrigationEnd on the next day\n        return currentTime >= irrigationStart || currentTime < irrigationEnd;\n    }\n}\n\n\n// Function to get current time in seconds\nfunction getCurrentTime() {\n    const now = new Date();\n    return now.getSeconds() + (60 * (now.getMinutes() + 60 * now.getHours()));\n}\n\n// Function to get current time in UTC seconds\nfunction getCurrentTimeUTC() {\n    const now = new Date();\n    const utcSeconds = (now.getUTCHours() * 3600) + (now.getUTCMinutes() * 60) + now.getUTCSeconds();\n    return utcSeconds;\n}\n\n// Function to retrieve state from Home Assistant\nfunction getHAState(state) {\n    // Check if the states object and the specific state exist\n    if (global.get('homeassistant') && global.get('homeassistant').homeAssistant\n        && global.get('homeassistant').homeAssistant.states\n        && global.get('homeassistant').homeAssistant.states[state]) {\n        return global.get('homeassistant').homeAssistant.states[state].state;\n    } else {\n        // Handle the case where the state or any parent object is undefined\n        node.warn(\"State not found or global object is undefined: \" + state);\n        return null; // or you can throw an error or return a default value\n    }\n}\n\n\n// Enhanced logging for debugging\nfunction logDebugData() {\n    if (debug) {\n        node.warn(\"Is in irrigation window? \" + inIrrigationWindow);\n        node.warn(\"Generative: \" + generative);\n        node.warn('Maintance Phase: '+ maintenancePhase)\n        node.warn(\"Dark Hours: \" + darkHours);\n        node.warn(\"Soil moisture: \" + soilMoisture);\n        node.warn(\"last Irrigation Run \" + utcMsToLocalHHMMSS(lastChangedTimeMs));\n        node.warn(\"Highest Sensor Value: \" + highestSoilsensorVal);\n        // Additional logging to help with debugging\n        node.warn(\"Moisture Difference: \" + moistureDifference);\n        node.warn(\"timeSinceLastIrrigation: \" + toHHMMSS(timeSinceLastIrrigation));\n        node.warn(\"Current Time: \" + new Date(currentTime * 1000).toISOString().substr(11, 8));\n        node.warn(\"Irrigation Start: \" + new Date(irrigationStart * 1000).toISOString().substr(11, 8));\n        node.warn(\"Irrigation End: \" + new Date(irrigationEnd * 1000).toISOString().substr(11, 8));\n    }\n}\n\n\n//function to make logbook entries\nfunction logbookMsg(message) {\n    \n    // Create a message object with the payload for the api-call-service node\n    const logMessage = {\n        payload: {\n            service_domain: 'logbook',\n            service: 'log',\n            data: {\n            entity_id: ENTITY_IDS.feedPumpSwitch,\n            name: \"Irrigation System\",\n            message: message\n            }\n        }\n    };\n\n    return logMessage;\n}\n\n//check for min time between irrigation\nfunction minStopTime() {\n    if (timeSinceLastIrrigation < MIN_IRRIGATION_FREQUENCY) {\n        logOutput = logbookMsg(`Last irrigation was less than ${MIN_IRRIGATION_FREQUENCY / 60} minutes ago. Not performing a check now.`);\n        node.send([null,null,null,null, logOutput]);\n        return true;\n    }\nreturn false;\n}\n\n//check for max dryback\nfunction maxDrybackCheck() {\n    if (moistureDifference > MAX_DELTA) {\n        logOutput = logbookMsg(\"Max Dryback Feeding\");\n        turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);\n        delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);\n        node.send([turnOnOutput, delayAndTurnOffOutput, null, null, logOutput]);\n        return true;\n    }\nreturn false;\n}\n//reset maintenance phase if outside irrigation window and it is on\nfunction resetMaintenancePhase() {\n    if (!inIrrigationWindow && maintenancePhase != 'off') {\n        logOutput = logbookMsg(\"Resetting Maintenance Switch\");\n        flipBooleanOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.maintenancePhase);\n        node.send([null, null, flipBooleanOutput, null, logOutput]);\n    }\nreturn false;\n}\n\n//reset highest soil sensor at beginging of lights on\nfunction setMaxSoilSensorTracker() {\n    //node.warn(\"set soil warn\" + (currentTime -lightOnTime))\n    //reset highest soil value sensor at beginging of lights on\n        logOutput = logbookMsg(\"Setting Highest Soil Sensor to VWC\");\n        setInputNumberOutput = buildPayload('set_value', 'number', ENTITY_IDS.highestSoilSensor, null, { value: soilMoisture});\n        node.send([null, null, null, setInputNumberOutput, null]);\n        return true;\n    }\n\n//reset highest soil sensor at beginging of lights on\nfunction resetMaxSoilSensorTracker() {\n    //node.warn(\"set soil warn\" + (currentTime -lightOnTime))\n    //reset highest soil value sensor at beginging of lights on\n    if (Math.abs(currentTime - lightOnTime) <= 60) {\n        logOutput = logbookMsg(\"Flipping Highest Soil Sensor to 0\");\n        setInputNumberOutput = buildPayload('set_value', 'number', ENTITY_IDS.highestSoilSensor, null, { value: 0 });\n        node.send([null, null, null, setInputNumberOutput, logOutput]);\n        return true;\n    }\nreturn false;\n}\n\n//switch maintenance phase if in irrigation window and desired moisture is reached\nfunction switchMaintenancePhase() {\n    if (maintenancePhase == 'off' && inIrrigationWindow) {\n        if (highestSoilsensorVal >= DESIRED_MOISTURE) {\n            logOutput = logbookMsg('P2 Flip Switch Desired Moisture Reached');\n            flipBooleanOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.maintenancePhase);\n            node.send ([null, null, flipBooleanOutput, null, logOutput]);\n            return true;\n        }\n    }\nreturn false;\n}\n//convert seconds to HH:MM:SS for output only\nfunction toHHMMSS(timeSeconds) {\n    const sec = parseInt(timeSeconds, 10); // convert value to number if it's string\n    let hours = Math.floor(sec / 3600); // get hours\n    let minutes = Math.floor((sec - (hours * 3600)) / 60); // get minutes\n    let seconds = sec - (hours * 3600) - (minutes * 60); // get seconds\n\n    // add 0 if value < 10; Example: 2 -> 02\n    if (hours < 10) { hours = \"0\" + hours; }\n    if (minutes < 10) { minutes = \"0\" + minutes; }\n    if (seconds < 10) { seconds = \"0\" + seconds; }\n\n    return hours + ':' + minutes + ':' + seconds; // Return is HH : MM : SS\n}\n\n//convert utc ms to local time HH:MM:SS\nfunction utcMsToLocalHHMMSS(utcMs) {\n    var date = new Date(utcMs);\n    return date.toLocaleTimeString('en-US', { hour12: false });\n}\n//run p1 and p2 feeds\nfunction processControlFlow() {\n    if (maintenancePhase == 'off' && moistureDifference > P1_THRESHOLD) {\n        logOutput = logbookMsg('P1 feed');\n        turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);\n        delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P1_FEED);\n        node.send([turnOnOutput, delayAndTurnOffOutput, null, null, logOutput]);\n    } else if ( maintenancePhase == 'on' && moistureDifference > P2_THRESHOLD) {\n        logOutput = logbookMsg('P2 feed');\n        turnOnOutput = buildPayload('turn_on', 'switch', ENTITY_IDS.feedPumpSwitch);\n        delayAndTurnOffOutput = buildPayload('turn_off', 'switch', ENTITY_IDS.feedPumpSwitch, DELAY_FOR_P2_FEED);\n        node.send ([turnOnOutput, delayAndTurnOffOutput, null, null, logOutput]);\n    }\n}\n\nlogDebugData();\ncheckForNullStates();\nsetMaxSoilSensorTracker();\nswitchMaintenancePhase();\nif (!minStopTime()) {\n    if (!maxDrybackCheck()) {\n        if (inIrrigationWindow) {\n            processControlFlow();\n        }\n    }   \n}\nresetMaintenancePhase();\nresetMaxSoilSensorTracker();",
+    "outputs": 5,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 308.0994567871094,
+    "y": 83.09091186523438,
+    "wires": [
+      [
+        "67a2a6b74fd0e587"
+      ],
+      [
+        "78c35e6ffe5cf2a0"
+      ],
+      [
+        "04f9adfef71dc994"
+      ],
+      [
+        "3e5676e88f6fe3b8"
+      ],
+      [
+        "a6889839ae6b2d83"
+      ]
+    ],
+    "outputLabels": [
+      "Turn On Feed",
+      "Turn Off Feed",
+      "Flip Input Boolean",
+      "Set Highest Value Back",
+      "Log To Logbook"
+    ]
+  },
+  {
+    "id": "8768cfef01f17877",
+    "type": "inject",
+    "z": "a826652fd99df3a0",
+    "name": "",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "60",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 128.09945678710938,
+    "y": 83.09091186523438,
+    "wires": [
+      [
+        "f8c51d0074321534"
+      ]
+    ]
+  },
+  {
+    "id": "67a2a6b74fd0e587",
+    "type": "api-call-service",
+    "z": "a826652fd99df3a0",
+    "name": "Turn Pump On",
+    "server": "",
+    "version": 5,
+    "debugenabled": true,
+    "domain": "{{payload.service_domain}}",
+    "service": "{{payload.service}}",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": [
+      "{{payload.entity_id}}"
+    ],
+    "data": "payload.message",
+    "dataType": "jsonata",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [],
+    "queue": "none",
+    "x": 688.0994567871094,
+    "y": 23.090911865234375,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "78c35e6ffe5cf2a0",
+    "type": "delay",
+    "z": "a826652fd99df3a0",
+    "name": "",
+    "pauseType": "delayv",
+    "timeout": "5",
+    "timeoutUnits": "seconds",
+    "rate": "1000",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1,
+    "x": 488.0994567871094,
+    "y": 63.090911865234375,
+    "wires": [
+      [
+        "b89eeece6d5ea559"
+      ]
+    ]
+  },
+  {
+    "id": "04f9adfef71dc994",
+    "type": "api-call-service",
+    "z": "a826652fd99df3a0",
+    "name": "Flip maintaince Switch",
+    "server": "",
+    "version": 5,
+    "debugenabled": true,
+    "domain": "{{payload.service_domain}}",
+    "service": "{{payload.service}}",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": [
+      "{{payload.entity_id}}"
+    ],
+    "data": "",
+    "dataType": "json",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [],
+    "queue": "none",
+    "x": 708.0994567871094,
+    "y": 143.09091186523438,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "3e5676e88f6fe3b8",
+    "type": "api-call-service",
+    "z": "a826652fd99df3a0",
+    "name": "Reset Max Soil Tracker",
+    "server": "",
+    "version": 5,
+    "debugenabled": true,
+    "domain": "{{payload.domain}}",
+    "service": "{{payload.service}}",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": [
+      "{{payload.entity_id}}"
+    ],
+    "data": "{{payload.data.value}}",
+    "dataType": "json",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [],
+    "queue": "none",
+    "x": 748.0994567871094,
+    "y": 203.09091186523438,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "a6889839ae6b2d83",
+    "type": "api-call-service",
+    "z": "a826652fd99df3a0",
+    "name": "Send Logbook Msg",
+    "server": "",
+    "version": 5,
+    "debugenabled": true,
+    "domain": "{{payload.service_domain}}",
+    "service": "{{payload.service}}",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": [],
+    "data": "payload.message\t\t",
+    "dataType": "jsonata",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [],
+    "queue": "none",
+    "x": 388.0994567871094,
+    "y": 183.09091186523438,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "b89eeece6d5ea559",
+    "type": "api-call-service",
+    "z": "a826652fd99df3a0",
+    "name": "Turn pump off",
+    "server": "",
+    "version": 5,
+    "debugenabled": true,
+    "domain": "{{payload.service_domain}}",
+    "service": "{{payload.service}}",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": [
+      "{{payload.entity_id}}"
+    ],
+    "data": "",
+    "dataType": "jsonata",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [],
+    "queue": "none",
+    "x": 688.0994567871094,
+    "y": 83.09091186523438,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "af6157ee2f35ec64",
+    "type": "inject",
+    "z": "a826652fd99df3a0",
+    "name": "",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "60",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 280,
+    "wires": [
+      [
+        "1e6dcc3c49033d86"
+      ]
+    ]
+  },
+  {
+    "id": "1e6dcc3c49033d86",
+    "type": "function",
+    "z": "a826652fd99df3a0",
+    "name": "Turn Lights On/Off",
+    "func": "const HA_CONFIG = {\n    homeAssistantObject: 'homeassistant.homeAssistant',\n    darkHoursEntity: 'number.side_1_table_2_dark_hours',\n    switchStateEntity: 'switch.sengled_e1c_nb7_switch_2',\n    lightsOnTimeEntity: 'time.side_1_table_2_lights_on_time',\n    lightControlEntity: 'switch.sengled_e1c_nb7_switch_2',\n    serviceDomain: 'switch'\n};\n\n// Fetch the Home Assistant object and states\nconst d = global.get(HA_CONFIG.homeAssistantObject);\nlet darkHours = parseFloat(d.states[HA_CONFIG.darkHoursEntity].state);\nlet switchState = d.states[HA_CONFIG.switchStateEntity].state;\nlet lightsOnTime = d.states[HA_CONFIG.lightsOnTimeEntity].state;\nlet debugMode = false;\n\n// Function to log debug messages with labels\nfunction logDebug(label, value) {\n    if (debugMode) {\n        node.warn(label + ' ' + value);\n    }\n}\n\n// Function to toggle debug mode on/off\nfunction toggleDebugMode() {\n    debugMode = !debugMode;\n    if (debugMode) {\n        node.warn('Debug mode is ON');\n    } else {\n        node.warn('Debug mode is OFF');\n    }\n}\n\n// Function to parse time in HH:mm:ss format to seconds\nfunction parseTimeToSeconds(timeStr) {\n    var parts = timeStr.split(':');\n    if (parts.length === 3) {\n        var hours = parseInt(parts[0]);\n        var minutes = parseInt(parts[1]);\n        var seconds = parseInt(parts[2]);\n        return hours * 3600 + minutes * 60 + seconds;\n    } else {\n        // Handle invalid time format if needed\n        node.error('Invalid time format in msg.lightOn');\n        return 0; // Return 0 as a fallback\n    }\n}\n\n// Function to calculate the lights control logic\nfunction calculateLightsControl() {\n    const currentDate = new Date();\n    const currentHours = currentDate.getHours();\n    const currentMinutes = currentDate.getMinutes();\n    const currentSeconds = currentDate.getSeconds();\n    const currentTime = (currentHours * 3600) + (currentMinutes * 60) + currentSeconds;\n    let lightsOnTimeInSeconds = parseTimeToSeconds(lightsOnTime);\n    let lightsOffTimeInSeconds = lightsOnTimeInSeconds + ((24 - darkHours) * 3600);\n\n    if (lightsOffTimeInSeconds >= 86400) {\n        lightsOffTimeInSeconds -= 86400;\n    }\n    \n    logDebug('lightsOnTimeInSeconds:', lightsOnTimeInSeconds);\n    logDebug('lightsOffTimeInSeconds:', lightsOffTimeInSeconds);\n    logDebug('darkHours:', darkHours);\n    logDebug('current time ', currentTime);\n    logDebug('Switch State: ', switchState);\n\n    if (lightsOnTimeInSeconds < lightsOffTimeInSeconds) {\n        if (currentTime >= lightsOnTimeInSeconds && currentTime < lightsOffTimeInSeconds) {\n            if (switchState == 'off') {\n                return turnOnLights();\n            }\n        } else {\n            if (switchState == 'on') {\n                return turnOffLights();\n            }\n        }\n    } else {\n        if (currentTime >= lightsOnTimeInSeconds || currentTime < lightsOffTimeInSeconds) {\n            if (switchState == 'off') {\n                return turnOnLights();\n            }\n        } else {\n            if (switchState == 'on') {\n                return turnOffLights();\n            }\n        }\n    }\n    \n    logDebug('No action needed', '');\n}\n\nfunction turnOnLights() {\n    msg.payload = {\n        service_domain: HA_CONFIG.serviceDomain,\n        service: 'turn_on',\n        entity_id: HA_CONFIG.lightControlEntity\n    };\n    logDebug('Turning on the lights', '');\n    return node.send(msg);\n}\n\nfunction turnOffLights() {\n    msg.payload = {\n        service_domain: HA_CONFIG.serviceDomain,\n        service: 'turn_off',\n        entity_id: HA_CONFIG.lightControlEntity\n    };\n    logDebug('Turning off the lights', '');\n    return node.send(msg);\n}\n\n// Call the calculateLightsControl function to perform the lights control logic\ncalculateLightsControl();\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 350,
+    "y": 300,
+    "wires": [
+      [
+        "af6c52a47d1b503f"
+      ]
+    ]
+  },
+  {
+    "id": "af6c52a47d1b503f",
+    "type": "api-call-service",
+    "z": "a826652fd99df3a0",
+    "name": "Call Service Payload Var",
+    "server": "",
+    "version": 5,
+    "debugenabled": true,
+    "domain": "{{payload.service_domain}}",
+    "service": "{{payload.service}}",
+    "areaId": [],
+    "deviceId": [],
+    "entityId": [
+      "{{payload.entity_id}}"
+    ],
+    "data": "",
+    "dataType": "jsonata",
+    "mergeContext": "",
+    "mustacheAltTags": false,
+    "outputProperties": [],
+    "queue": "none",
+    "x": 610,
+    "y": 280,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "eb7d5955fdaf8e22",
+    "type": "ha-number",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 Highest Soil Reading",
+    "version": 1,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "016894b0f307adf7",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 200,
+    "y": 680,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "ace6c1f93a2269a1",
+    "type": "ha-switch",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 Maintenance Phase",
+    "version": 0,
+    "debugenabled": false,
+    "inputs": 1,
+    "outputs": 2,
+    "entityConfig": "f4ff0d1e97276844",
+    "enableInput": true,
+    "outputOnStateChange": false,
+    "outputProperties": [
+      {
+        "property": "outputType",
+        "propertyType": "msg",
+        "value": "state change",
+        "valueType": "str"
+      },
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "entityState"
+      }
+    ],
+    "x": 520,
+    "y": 680,
+    "wires": [
+      [],
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "f4ad8d255fb1e74c",
+    "type": "ha-switch",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 Generative ",
+    "version": 0,
+    "debugenabled": false,
+    "inputs": 1,
+    "outputs": 2,
+    "entityConfig": "abb119775b0b3ed3",
+    "enableInput": true,
+    "outputOnStateChange": false,
+    "outputProperties": [
+      {
+        "property": "outputType",
+        "propertyType": "msg",
+        "value": "state change",
+        "valueType": "str"
+      },
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "entityState"
+      }
+    ],
+    "x": 179.0994415283203,
+    "y": 752.54541015625,
+    "wires": [
+      [],
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "085359c72777fe32",
+    "type": "ha-time-entity",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 Lights On Time",
+    "version": 0,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "c1d8138ae2c8fc10",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 460,
+    "y": 760,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "e80956b63bb78b14",
+    "type": "ha-number",
+    "z": "a826652fd99df3a0",
+    "name": "Side 1 Table 2 Max Dryback",
+    "version": 1,
+    "debugenabled": false,
+    "inputs": 0,
+    "outputs": 1,
+    "entityConfig": "738a591ae03dd3f5",
+    "mode": "listen",
+    "value": "payload",
+    "valueType": "msg",
+    "outputProperties": [
+      {
+        "property": "payload",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "value"
+      },
+      {
+        "property": "previousValue",
+        "propertyType": "msg",
+        "value": "",
+        "valueType": "previousValue"
+      }
+    ],
+    "x": 440,
+    "y": 540,
+    "wires": [
+      []
+    ],
+    "server": ""
+  },
+  {
+    "id": "3b1aac4b8e11aa97",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "c599125aba891332",
+    "name": "Side 1 Table 2 P2 Dryback ",
+    "version": "6",
+    "entityType": "number",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 P2 Dryback"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      },
+      {
+        "property": "unit_of_measurement",
+        "value": "%"
+      },
+      {
+        "property": "min_value",
+        "value": 2
+      },
+      {
+        "property": "max_value",
+        "value": 50
+      },
+      {
+        "property": "step_value",
+        "value": 1
+      },
+      {
+        "property": "mode",
+        "value": "box"
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "52b67ba70833bf17",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "5fd6e22b972c054a",
+    "name": "Side 1 Table 2 Moisture Target",
+    "version": "6",
+    "entityType": "number",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 Moisture Target"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      },
+      {
+        "property": "unit_of_measurement",
+        "value": "%"
+      },
+      {
+        "property": "min_value",
+        "value": ""
+      },
+      {
+        "property": "max_value",
+        "value": ""
+      },
+      {
+        "property": "step_value",
+        "value": 1
+      },
+      {
+        "property": "mode",
+        "value": "box"
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "7af6402dfb23d731",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "5451b60cb9cc9577",
+    "name": "Side 1 Table 2 P1 Delay",
+    "version": "6",
+    "entityType": "number",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 P1 Delay"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      },
+      {
+        "property": "unit_of_measurement",
+        "value": "seconds"
+      },
+      {
+        "property": "min_value",
+        "value": ""
+      },
+      {
+        "property": "max_value",
+        "value": 5000
+      },
+      {
+        "property": "step_value",
+        "value": ""
+      },
+      {
+        "property": "mode",
+        "value": "box"
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "b2ddf247d46cd1eb",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "9e79752795d3e271",
+    "name": "Side 1 Table 2 P2 Delay",
+    "version": "6",
+    "entityType": "number",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 P2 Delay"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      },
+      {
+        "property": "unit_of_measurement",
+        "value": "seconds"
+      },
+      {
+        "property": "min_value",
+        "value": ""
+      },
+      {
+        "property": "max_value",
+        "value": 5000
+      },
+      {
+        "property": "step_value",
+        "value": ""
+      },
+      {
+        "property": "mode",
+        "value": "box"
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "091ba25d13f32e9f",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "ebf7fca5e63e827c",
+    "name": "Side 1 Table 2 Dark Hours",
+    "version": "6",
+    "entityType": "number",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 Dark Hours"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      },
+      {
+        "property": "unit_of_measurement",
+        "value": "hrs"
+      },
+      {
+        "property": "min_value",
+        "value": 0
+      },
+      {
+        "property": "max_value",
+        "value": 24
+      },
+      {
+        "property": "step_value",
+        "value": 1
+      },
+      {
+        "property": "mode",
+        "value": "box"
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "016894b0f307adf7",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "e1d657851ccfe7d7",
+    "name": "Side 1 Table 2 Highest Soil %",
+    "version": "6",
+    "entityType": "number",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 Highest Soil %"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      },
+      {
+        "property": "unit_of_measurement",
+        "value": "%"
+      },
+      {
+        "property": "min_value",
+        "value": ""
+      },
+      {
+        "property": "max_value",
+        "value": ""
+      },
+      {
+        "property": "step_value",
+        "value": ""
+      },
+      {
+        "property": "mode",
+        "value": "box"
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "f4ff0d1e97276844",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "56ef9ca7dd72c341",
+    "name": "Side 1 Table 2 Maintenance Phase",
+    "version": "6",
+    "entityType": "switch",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 Maintenance Phase"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "abb119775b0b3ed3",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "16d708474df46870",
+    "name": "Side 1 Table 2 Generative ",
+    "version": "6",
+    "entityType": "switch",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 Generative "
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "c1d8138ae2c8fc10",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "96fb2de74520ef1a",
+    "name": "Side 1 Table 2 Lights On Time",
+    "version": "6",
+    "entityType": "time",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 Lights On Time"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "738a591ae03dd3f5",
+    "type": "ha-entity-config",
+    "server": "",
+    "deviceConfig": "eeed088d60b506ea",
+    "name": "Side 1 Table 2 Max Drybacks",
+    "version": "6",
+    "entityType": "number",
+    "haConfig": [
+      {
+        "property": "name",
+        "value": "Side 1 Table 2 Max Drybacks"
+      },
+      {
+        "property": "icon",
+        "value": ""
+      },
+      {
+        "property": "entity_picture",
+        "value": ""
+      },
+      {
+        "property": "entity_category",
+        "value": ""
+      },
+      {
+        "property": "device_class",
+        "value": ""
+      },
+      {
+        "property": "unit_of_measurement",
+        "value": "%"
+      },
+      {
+        "property": "min_value",
+        "value": ""
+      },
+      {
+        "property": "max_value",
+        "value": ""
+      },
+      {
+        "property": "step_value",
+        "value": ""
+      },
+      {
+        "property": "mode",
+        "value": "box"
+      }
+    ],
+    "resend": false,
+    "debugEnabled": false
+  },
+  {
+    "id": "c599125aba891332",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 P2 Dryback",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "5fd6e22b972c054a",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 Moisture Target",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "new",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "5451b60cb9cc9577",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 P1 Delay",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "9e79752795d3e271",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 P2 Delay",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "ebf7fca5e63e827c",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 Dark Hours",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "e1d657851ccfe7d7",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 Highest Soil Reading",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "56ef9ca7dd72c341",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 Maintenance Phase",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "16d708474df46870",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 Generative",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "96fb2de74520ef1a",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 Lights On Time",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  },
+  {
+    "id": "eeed088d60b506ea",
+    "type": "ha-device-config",
+    "name": "Side 1 Table 2 Max Dryback",
+    "hwVersion": "",
+    "manufacturer": "Node-RED",
+    "model": "",
+    "swVersion": "",
+    "server": ""
+  }
+]
